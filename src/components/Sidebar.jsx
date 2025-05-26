@@ -17,6 +17,7 @@ import {
     MusicNote as SamplesIcon,
     CloudUpload as UploadIcon,
     PlaylistPlay as PlaylistsIcon,
+    Whatshot as HotIcon,
     Settings as SettingsIcon
 } from '@mui/icons-material';
 
@@ -30,6 +31,7 @@ const Sidebar = () => {
         { text: 'Samples', icon: <SamplesIcon />, path: '/samples' },
         { text: 'Upload', icon: <UploadIcon />, path: '/upload' },
         { text: 'Playlists', icon: <PlaylistsIcon />, path: '/playlists' },
+        { text: 'HOT', icon: <HotIcon />, path: '/hot' },
         { text: 'Settings', icon: <SettingsIcon />, path: '/settings' }
     ];
 
