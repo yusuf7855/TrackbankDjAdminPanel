@@ -56,10 +56,10 @@ const Sidebar = () => {
             description: 'Yeni sample yükle'
         },
         {
-            text: 'Category Playlists',
+            text: 'Genre Playlists', // Category Playlists -> Genre Playlists
             icon: <PlaylistsIcon />,
             path: '/playlists',
-            description: 'Kategori playlist\'leri',
+            description: 'Genre playlist\'leri', // Kategori -> Genre
             isUpdated: true
         },
         {
@@ -124,7 +124,7 @@ const Sidebar = () => {
                         🎵 Music Management
                     </Typography>
                     <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                        Profesyonel müzik yönetim sistemi
+                        Genre tabanlı müzik yönetim sistemi
                     </Typography>
                 </Box>
             </Box>
@@ -240,7 +240,7 @@ const Sidebar = () => {
                         <Chip label="124" size="small" variant="outlined" />
                     </Box>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Category Playlists</Typography>
+                        <Typography variant="body2">Genre Playlists</Typography>
                         <Chip label="15" size="small" sx={{ bgcolor: '#9c27b0', color: 'white' }} />
                     </Box>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -256,7 +256,7 @@ const Sidebar = () => {
                     DJ Sample Bank v2.0
                 </Typography>
                 <Typography variant="caption" color="text.secondary" textAlign="center" display="block">
-                    © 2024 - Admin Panel
+                    © 2024 - Genre System
                 </Typography>
             </Box>
         </Drawer>

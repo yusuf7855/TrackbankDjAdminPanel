@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -65,32 +65,28 @@ export const Playlists = () => {
     const [selectedMusicCategory, setSelectedMusicCategory] = useState('all');
     const [tabValue, setTabValue] = useState(0);
 
-    const [playlistForm, setPlaylistForm] = useState({
-        name: '',
-        description: '',
-        mainCategory: 'afrohouse',
-        subCategory: ''
-    });
+    // Form state - BASIT OBJE
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [genre, setGenre] = useState('afrohouse');
+    const [subCategory, setSubCategory] = useState('');
 
-    const categories = [
+    // Kategori listesi
+    const categories = useMemo(() => [
         { value: 'all', label: 'Tüm Kategoriler', color: '#4caf50' },
         { value: 'afrohouse', label: 'Afro House', color: '#ff9800' },
         { value: 'indiedance', label: 'Indie Dance', color: '#e91e63' },
         { value: 'organichouse', label: 'Organic House', color: '#8bc34a' },
         { value: 'downtempo', label: 'Down Tempo', color: '#2196f3' },
         { value: 'melodichouse', label: 'Melodic House', color: '#9c27b0' }
-    ];
+    ], []);
 
     useEffect(() => {
         fetchPlaylists();
         fetchMusics();
     }, []);
 
-    useEffect(() => {
-        filterMusics();
-    }, [musics, selectedMusicCategory, musicSearchTerm]);
-
-    const fetchPlaylists = async () => {
+    const fetchPlaylists = useCallback(async () => {
         try {
             const response = await axios.get('http://localhost:5000/api/playlists/admin');
             setPlaylists(response.data.playlists || []);
@@ -100,9 +96,9 @@ export const Playlists = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const fetchMusics = async () => {
+    const fetchMusics = useCallback(async () => {
         try {
             const response = await axios.get('http://localhost:5000/api/music');
             setMusics(response.data || []);
@@ -110,17 +106,15 @@ export const Playlists = () => {
             console.error('Error fetching musics:', error);
             setError('Müzik kütüphanesi yüklenirken hata oluştu');
         }
-    };
+    }, []);
 
     const filterMusics = useCallback(() => {
-        let filtered = musics;
+        let filtered = [...musics];
 
-        // Category filter
         if (selectedMusicCategory !== 'all') {
             filtered = filtered.filter(music => music.category === selectedMusicCategory);
         }
 
-        // Search filter
         if (musicSearchTerm) {
             filtered = filtered.filter(music =>
                 music.title.toLowerCase().includes(musicSearchTerm.toLowerCase()) ||
@@ -131,17 +125,16 @@ export const Playlists = () => {
         setFilteredMusics(filtered);
     }, [musics, selectedMusicCategory, musicSearchTerm]);
 
-    const handleInputChange = useCallback((e) => {
-        const { name, value } = e.target;
-        setPlaylistForm(prev => ({ ...prev, [name]: value }));
-    }, []);
+    useEffect(() => {
+        filterMusics();
+    }, [filterMusics]);
 
-    const validateForm = () => {
-        if (!playlistForm.name.trim()) {
+    const validateForm = useCallback(() => {
+        if (!name?.trim()) {
             setError('Playlist adı gereklidir');
             return false;
         }
-        if (!playlistForm.subCategory.trim()) {
+        if (!subCategory?.trim()) {
             setError('Alt kategori kodu gereklidir (örn: AH1, MH1)');
             return false;
         }
@@ -154,14 +147,17 @@ export const Playlists = () => {
             return false;
         }
         return true;
-    };
+    }, [name, subCategory, selectedMusics.length]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
         if (!validateForm()) return;
 
         try {
             const data = {
-                ...playlistForm,
+                name,
+                description,
+                genre,
+                subCategory,
                 musicIds: selectedMusics
             };
 
@@ -173,44 +169,42 @@ export const Playlists = () => {
                 setSuccess('Admin playlist başarıyla oluşturuldu');
             }
 
-            fetchPlaylists();
+            await fetchPlaylists();
             resetForm();
         } catch (error) {
             console.error('Error saving playlist:', error);
             if (error.response?.data?.message?.includes('Duplicate')) {
-                setError('Bu kategori ve alt kategori kombinasyonu zaten mevcut');
+                setError('Bu genre ve alt kategori kombinasyonu zaten mevcut');
             } else {
                 setError('Admin playlist kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message));
             }
         }
-    };
+    }, [validateForm, name, description, genre, subCategory, selectedMusics, editingPlaylist, fetchPlaylists]);
 
-    const handleEdit = (playlist) => {
+    const handleEdit = useCallback((playlist) => {
         setEditingPlaylist(playlist);
-        setPlaylistForm({
-            name: playlist.name,
-            description: playlist.description,
-            mainCategory: playlist.mainCategory,
-            subCategory: playlist.subCategory
-        });
+        setName(playlist.name || '');
+        setDescription(playlist.description || '');
+        setGenre(playlist.genre || 'afrohouse');
+        setSubCategory(playlist.subCategory || '');
         setSelectedMusics(playlist.musics?.map(m => m._id) || []);
         setOpenDialog(true);
-    };
+    }, []);
 
-    const handleDelete = async (id) => {
+    const handleDelete = useCallback(async (id) => {
         if (window.confirm('Bu admin playlist\'i silmek istediğinizden emin misiniz?')) {
             try {
                 await axios.delete(`http://localhost:5000/api/playlists/admin/${id}`);
                 setSuccess('Admin playlist başarıyla silindi');
-                fetchPlaylists();
+                await fetchPlaylists();
             } catch (error) {
                 console.error('Error deleting playlist:', error);
                 setError('Admin playlist silinirken hata oluştu');
             }
         }
-    };
+    }, [fetchPlaylists]);
 
-    const handleMusicToggle = (musicId) => {
+    const handleMusicToggle = useCallback((musicId) => {
         setSelectedMusics(prev => {
             const newSelection = prev.includes(musicId)
                 ? prev.filter(id => id !== musicId)
@@ -223,32 +217,32 @@ export const Playlists = () => {
 
             return newSelection;
         });
-    };
+    }, []);
 
-    const resetForm = () => {
-        setPlaylistForm({
-            name: '',
-            description: '',
-            mainCategory: 'afrohouse',
-            subCategory: ''
-        });
+    const resetForm = useCallback(() => {
+        setName('');
+        setDescription('');
+        setGenre('afrohouse');
+        setSubCategory('');
         setSelectedMusics([]);
         setEditingPlaylist(null);
         setOpenDialog(false);
         setError(null);
         setTabValue(0);
-    };
+    }, []);
 
-    const getCategoryColor = (category) => {
+    const getCategoryColor = useCallback((category) => {
         return categories.find(c => c.value === category)?.color || '#757575';
-    };
+    }, [categories]);
 
-    const filteredPlaylists = playlists.filter(playlist => {
-        const matchesCategory = filterCategory === 'all' || playlist.mainCategory === filterCategory;
-        const matchesSearch = playlist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            playlist.subCategory?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesCategory && matchesSearch;
-    });
+    const filteredPlaylists = useMemo(() => {
+        return playlists.filter(playlist => {
+            const matchesCategory = filterCategory === 'all' || playlist.genre === filterCategory;
+            const matchesSearch = playlist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                playlist.subCategory?.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchesCategory && matchesSearch;
+        });
+    }, [playlists, filterCategory, searchTerm]);
 
     const TabPanel = ({ children, value, index }) => (
         <div hidden={value !== index}>
@@ -277,10 +271,10 @@ export const Playlists = () => {
                     </Avatar>
                     <Box>
                         <Typography variant="h4" fontWeight="bold">
-                            Admin Kategori Playlist'leri
+                            Admin Genre Playlist'leri
                         </Typography>
                         <Typography variant="subtitle1" color="text.secondary">
-                            Mobil uygulama için kategori playlist'leri yönetin (Alt kategori kodlu)
+                            Mobil uygulama için genre playlist'leri yönetin (Alt kategori kodlu)
                         </Typography>
                     </Box>
                 </Box>
@@ -304,13 +298,13 @@ export const Playlists = () => {
             <Card sx={{ mb: 3, bgcolor: '#f3e5f5' }}>
                 <CardContent>
                     <Typography variant="h6" color="primary" gutterBottom>
-                        ℹ️ Sistem Açıklaması
+                        ℹ️ Genre Sistem Açıklaması
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        • <strong>Admin Playlist'ler:</strong> Burada oluşturulan playlist'ler mobil uygulamada kategoriler altında gözükür<br/>
+                        • <strong>Admin Playlist'ler:</strong> Burada oluşturulan playlist'ler mobil uygulamada genre'lar altında gözükür<br/>
                         • <strong>Kullanıcı Playlist'leri:</strong> Uygulama kullanıcıları bu admin playlist'lerindeki müziklerden kendi kişisel playlist'lerini oluşturur<br/>
-                        • <strong>Ayrım:</strong> Admin ve kullanıcı playlist'leri tamamen ayrı sistemlerdir<br/>
-                        • <strong>HOT Sistem:</strong> Her kategoriden en son eklenen admin playlist HOT olarak görünür
+                        • <strong>Genre Sistemi:</strong> Artık tek bir genre sistemi kullanılıyor: Afro House, Indie Dance, Organic House, Down Tempo, Melodic House<br/>
+                        • <strong>HOT Sistem:</strong> Her genre'den en son eklenen admin playlist HOT olarak görünür
                     </Typography>
                 </CardContent>
             </Card>
@@ -350,10 +344,10 @@ export const Playlists = () => {
                         </Grid>
                         <Grid item xs={12} sm={6} md={4}>
                             <FormControl fullWidth>
-                                <InputLabel>Ana Kategori Filtresi</InputLabel>
+                                <InputLabel>Genre Filtresi</InputLabel>
                                 <Select
                                     value={filterCategory}
-                                    label="Ana Kategori Filtresi"
+                                    label="Genre Filtresi"
                                     onChange={(e) => setFilterCategory(e.target.value)}
                                 >
                                     {categories.map(category => (
@@ -390,7 +384,7 @@ export const Playlists = () => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Playlist Adı</TableCell>
-                            <TableCell>Ana Kategori</TableCell>
+                            <TableCell>Genre</TableCell>
                             <TableCell>Alt Kategori</TableCell>
                             <TableCell>Müzik Sayısı</TableCell>
                             <TableCell>Oluşturulma Tarihi</TableCell>
@@ -412,10 +406,10 @@ export const Playlists = () => {
                                 </TableCell>
                                 <TableCell>
                                     <Chip
-                                        label={categories.find(c => c.value === playlist.mainCategory)?.label || playlist.mainCategory}
+                                        label={categories.find(c => c.value === playlist.genre)?.label || playlist.genre}
                                         size="small"
                                         sx={{
-                                            bgcolor: getCategoryColor(playlist.mainCategory),
+                                            bgcolor: getCategoryColor(playlist.genre),
                                             color: 'white',
                                             fontWeight: 'bold'
                                         }}
@@ -427,8 +421,8 @@ export const Playlists = () => {
                                         size="small"
                                         variant="outlined"
                                         sx={{
-                                            borderColor: getCategoryColor(playlist.mainCategory),
-                                            color: getCategoryColor(playlist.mainCategory),
+                                            borderColor: getCategoryColor(playlist.genre),
+                                            color: getCategoryColor(playlist.genre),
                                             fontWeight: 'bold'
                                         }}
                                     />
@@ -482,7 +476,12 @@ export const Playlists = () => {
             )}
 
             {/* Create/Edit Admin Playlist Dialog */}
-            <Dialog open={openDialog} onClose={resetForm} maxWidth="lg" fullWidth>
+            <Dialog
+                open={openDialog}
+                onClose={resetForm}
+                maxWidth="lg"
+                fullWidth
+            >
                 <DialogTitle sx={{ pb: 1 }}>
                     <Box display="flex" alignItems="center">
                         <PlaylistAddIcon sx={{ mr: 1, color: '#9c27b0' }} />
@@ -503,36 +502,28 @@ export const Playlists = () => {
                                 <TextField
                                     fullWidth
                                     label="Admin Playlist Adı"
-                                    name="name"
-                                    value={playlistForm.name}
-                                    onChange={handleInputChange}
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
                                     required
-                                    error={!playlistForm.name.trim()}
-                                    helperText={!playlistForm.name.trim() ? 'Playlist adı gereklidir' : ''}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
                                     label="Alt Kategori Kodu"
-                                    name="subCategory"
-                                    value={playlistForm.subCategory}
-                                    onChange={handleInputChange}
+                                    value={subCategory}
+                                    onChange={(e) => setSubCategory(e.target.value.toUpperCase())}
                                     placeholder="AH1, MH1, ID1..."
                                     required
-                                    error={!playlistForm.subCategory.trim()}
-                                    helperText="Örn: AH1 (Afro House 1), MH1 (Melodic House 1)"
-                                    inputProps={{ style: { textTransform: 'uppercase' } }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <FormControl fullWidth>
-                                    <InputLabel>Ana Kategori</InputLabel>
+                                    <InputLabel>Genre</InputLabel>
                                     <Select
-                                        name="mainCategory"
-                                        value={playlistForm.mainCategory}
-                                        label="Ana Kategori"
-                                        onChange={handleInputChange}
+                                        value={genre}
+                                        label="Genre"
+                                        onChange={(e) => setGenre(e.target.value)}
                                         required
                                     >
                                         {categories.filter(c => c.value !== 'all').map(category => (
@@ -558,9 +549,8 @@ export const Playlists = () => {
                                 <TextField
                                     fullWidth
                                     label="Açıklama"
-                                    name="description"
-                                    value={playlistForm.description}
-                                    onChange={handleInputChange}
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
                                     multiline
                                     rows={3}
                                     placeholder="Bu admin playlist hakkında kısa bir açıklama yazın..."
@@ -584,10 +574,10 @@ export const Playlists = () => {
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <FormControl fullWidth>
-                                    <InputLabel>Müzik Kategorisi</InputLabel>
+                                    <InputLabel>Müzik Genre'si</InputLabel>
                                     <Select
                                         value={selectedMusicCategory}
-                                        label="Müzik Kategorisi"
+                                        label="Müzik Genre'si"
                                         onChange={(e) => setSelectedMusicCategory(e.target.value)}
                                     >
                                         {categories.map(category => (
@@ -612,7 +602,7 @@ export const Playlists = () => {
                         </Grid>
 
                         <Alert severity="info" sx={{ mb: 2 }}>
-                            Maksimum 10 müzik seçebilirsiniz. Seçilen müziklerin kategorisi otomatik olarak playlist'in ana kategorisi ile aynı yapılacak.
+                            Maksimum 10 müzik seçebilirsiniz. Seçilen müziklerin kategorisi otomatik olarak playlist'in genre'si ile aynı yapılacak.
                         </Alert>
 
                         <List sx={{ maxHeight: 400, overflow: 'auto' }}>

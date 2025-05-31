@@ -26,7 +26,8 @@ const Hot = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const categories = {
+    // Genre sistemine güncellendi
+    const genres = {
         afrohouse: { label: 'Afro House', color: '#ff9800' },
         indiedance: { label: 'Indie Dance', color: '#e91e63' },
         organichouse: { label: 'Organic House', color: '#8bc34a' },
@@ -71,10 +72,10 @@ const Hot = () => {
                     </Avatar>
                     <Box>
                         <Typography variant="h4" fontWeight="bold">
-                            HOT Playlists
+                            HOT Genre Playlists
                         </Typography>
                         <Typography variant="subtitle1" color="text.secondary">
-                            Her kategoriden en son eklenen admin playlist'ler
+                            Her genre'den en son eklenen admin playlist'ler
                         </Typography>
                     </Box>
                 </Box>
@@ -100,11 +101,12 @@ const Hot = () => {
             <Card sx={{ mb: 3, bgcolor: '#fff3e0' }}>
                 <CardContent>
                     <Typography variant="h6" color="primary" gutterBottom>
-                        🔥 HOT Sistem Açıklaması
+                        🔥 HOT Genre Sistem Açıklaması
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        HOT sayfası her kategoriden en son eklenen admin playlist'i gösterir.
+                        HOT sayfası her genre'den en son eklenen admin playlist'i gösterir.
                         Bu playlist'ler mobil uygulamada öne çıkan içerik olarak görünür.
+                        Artık tek bir genre sistemi kullanılıyor: Afro House, Indie Dance, Organic House, Down Tempo, Melodic House.
                     </Typography>
                 </CardContent>
             </Card>
@@ -132,10 +134,10 @@ const Hot = () => {
                                             {playlist.name}
                                         </Typography>
                                         <Chip
-                                            label={playlist.categoryDisplayName || categories[playlist.mainCategory]?.label}
+                                            label={playlist.genreDisplayName || genres[playlist.genre]?.label}
                                             size="small"
                                             sx={{
-                                                bgcolor: categories[playlist.mainCategory]?.color || '#757575',
+                                                bgcolor: genres[playlist.genre]?.color || '#757575',
                                                 color: 'white',
                                                 fontWeight: 'bold'
                                             }}
@@ -171,8 +173,8 @@ const Hot = () => {
                                         size="small"
                                         variant="outlined"
                                         sx={{
-                                            borderColor: categories[playlist.mainCategory]?.color,
-                                            color: categories[playlist.mainCategory]?.color,
+                                            borderColor: genres[playlist.genre]?.color,
+                                            color: genres[playlist.genre]?.color,
                                             fontWeight: 'bold'
                                         }}
                                     />
@@ -192,7 +194,7 @@ const Hot = () => {
                                     size="small"
                                     startIcon={<PlayIcon />}
                                     sx={{
-                                        color: categories[playlist.mainCategory]?.color,
+                                        color: genres[playlist.genre]?.color,
                                         fontWeight: 'bold'
                                     }}
                                 >
@@ -212,8 +214,8 @@ const Hot = () => {
                             HOT Playlist Bulunamadı
                         </Typography>
                         <Typography variant="body2" color="text.secondary" mb={3}>
-                            Henüz hiç admin playlist eklenmemiş. Category Playlists sayfasından
-                            her kategori için playlist oluşturun.
+                            Henüz hiç admin playlist eklenmemiş. Genre Playlists sayfasından
+                            her genre için playlist oluşturun.
                         </Typography>
                     </CardContent>
                 </Card>
