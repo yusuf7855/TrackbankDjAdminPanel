@@ -19,7 +19,6 @@ import {
     MusicNote as SamplesIcon,
     CloudUpload as UploadIcon,
     PlaylistPlay as PlaylistsIcon,
-    Whatshot as HotIcon,
     Settings as SettingsIcon,
     Analytics as AnalyticsIcon
 } from '@mui/icons-material';
@@ -57,16 +56,11 @@ const Sidebar = () => {
             description: 'Yeni sample yükle'
         },
         {
-            text: 'Playlists',
+            text: 'Category Playlists',
             icon: <PlaylistsIcon />,
             path: '/playlists',
-            description: 'Müzik listeleri'
-        },
-        {
-            text: 'HOT Playlists',
-            icon: <HotIcon />,
-            path: '/hot',
-            description: 'Öne çıkan listeler'
+            description: 'Kategori playlist\'leri',
+            isUpdated: true
         },
         {
             text: 'Settings',
@@ -212,6 +206,19 @@ const Sidebar = () => {
                                                 }}
                                             />
                                         )}
+                                        {item.isUpdated && (
+                                            <Chip
+                                                label="UPDATED"
+                                                size="small"
+                                                sx={{
+                                                    height: 20,
+                                                    fontSize: '0.7rem',
+                                                    bgcolor: '#4caf50',
+                                                    color: 'white',
+                                                    fontWeight: 'bold'
+                                                }}
+                                            />
+                                        )}
                                     </Box>
                                 }
                             />
@@ -233,8 +240,8 @@ const Sidebar = () => {
                         <Chip label="124" size="small" variant="outlined" />
                     </Box>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">HOT Playlists</Typography>
-                        <Chip label="8" size="small" sx={{ bgcolor: '#ff6b35', color: 'white' }} />
+                        <Typography variant="body2">Category Playlists</Typography>
+                        <Chip label="15" size="small" sx={{ bgcolor: '#9c27b0', color: 'white' }} />
                     </Box>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                         <Typography variant="body2">Active Users</Typography>

@@ -23,7 +23,7 @@ import {
     PlaylistPlay as PlaylistIcon,
     CloudDownload as DownloadIcon,
     AttachMoney as MoneyIcon,
-    Whatshot as HotIcon,
+    Category as CategoryIcon,
     TrendingUp as TrendingIcon,
     People as PeopleIcon,
     Storage as StorageIcon,
@@ -39,11 +39,11 @@ const Dashboard = () => {
         totalPlaylists: 0,
         totalDownloads: 0,
         totalRevenue: 0,
-        hotPlaylists: 0,
+        categoryPlaylists: 0,
         activeUsers: 0
     });
     const [recentActivity, setRecentActivity] = useState([]);
-    const [hotPlaylists, setHotPlaylists] = useState([]);
+    const [latestPlaylists, setLatestPlaylists] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -54,10 +54,9 @@ const Dashboard = () => {
         setLoading(true);
         try {
             // Fetch all data in parallel
-            const [samplesRes, playlistsRes, hotRes] = await Promise.all([
+            const [samplesRes, playlistsRes] = await Promise.all([
                 axios.get('http://localhost:5000/api/samples'),
-                axios.get('http://localhost:5000/api/playlists/public'),
-                axios.get('http://localhost:5000/api/hot')
+                axios.get('http://localhost:5000/api/playlists')
             ]);
 
             setStats({
@@ -65,11 +64,12 @@ const Dashboard = () => {
                 totalPlaylists: playlistsRes.data?.playlists?.length || 0,
                 totalDownloads: 2847, // Mock data
                 totalRevenue: 1245.50, // Mock data
-                hotPlaylists: hotRes.data?.hots?.length || 0,
+                categoryPlaylists: playlistsRes.data?.playlists?.length || 0,
                 activeUsers: 2400 // Mock data
             });
 
-            setHotPlaylists(hotRes.data?.hots?.slice(0, 5) || []);
+            // En son eklenen 5 playlist'i al
+            setLatestPlaylists(playlistsRes.data?.playlists?.slice(0, 5) || []);
 
             // Mock recent activity
             setRecentActivity([
@@ -81,11 +81,11 @@ const Dashboard = () => {
                     category: 'Afro House'
                 },
                 {
-                    type: 'hot',
-                    name: 'Summer Vibes 2024',
+                    type: 'playlist',
+                    name: 'AH1 - Summer Vibes 2024',
                     action: 'created',
                     time: '4 saat önce',
-                    category: 'HOT Playlist'
+                    category: 'Afro House'
                 },
                 {
                     type: 'download',
@@ -95,11 +95,11 @@ const Dashboard = () => {
                     category: 'Organic House'
                 },
                 {
-                    type: 'playlist',
-                    name: 'Indie Dance Collection',
-                    action: 'updated',
+                    type: 'music',
+                    name: 'Deep Forest Vibes',
+                    action: 'added',
                     time: '1 gün önce',
-                    category: 'Indie Dance'
+                    category: 'Melodic House'
                 }
             ]);
 
@@ -215,10 +215,10 @@ const Dashboard = () => {
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                     <StatCard
-                        title="HOT Playlists"
-                        value={stats.hotPlaylists}
-                        icon={<HotIcon />}
-                        color="#ff6b35"
+                        title="Category Playlists"
+                        value={stats.categoryPlaylists}
+                        icon={<CategoryIcon />}
+                        color="#9c27b0"
                         trend="up"
                         trendValue="25"
                     />
@@ -235,10 +235,10 @@ const Dashboard = () => {
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                     <StatCard
-                        title="Playlists"
-                        value={stats.totalPlaylists}
+                        title="Music Tracks"
+                        value="450"
                         icon={<PlaylistIcon />}
-                        color="#9c27b0"
+                        color="#ff9800"
                         trend="up"
                         trendValue="15"
                     />
@@ -248,7 +248,7 @@ const Dashboard = () => {
                         title="Revenue"
                         value={`$${stats.totalRevenue}`}
                         icon={<MoneyIcon />}
-                        color="#ff9800"
+                        color="#ff6b35"
                         trend="up"
                         trendValue="22"
                     />
@@ -284,14 +284,14 @@ const Dashboard = () => {
                                             sx={{
                                                 mr: 2,
                                                 bgcolor: activity.type === 'sample' ? '#1976d2' :
-                                                    activity.type === 'hot' ? '#ff6b35' :
-                                                        activity.type === 'download' ? '#4caf50' : '#9c27b0',
+                                                    activity.type === 'playlist' ? '#9c27b0' :
+                                                        activity.type === 'download' ? '#4caf50' : '#ff9800',
                                                 width: 40,
                                                 height: 40
                                             }}
                                         >
                                             {activity.type === 'sample' ? <MusicNoteIcon /> :
-                                                activity.type === 'hot' ? <HotIcon /> :
+                                                activity.type === 'playlist' ? <CategoryIcon /> :
                                                     activity.type === 'download' ? <DownloadIcon /> : <PlaylistIcon />}
                                         </Avatar>
                                         <ListItemText
@@ -315,11 +315,11 @@ const Dashboard = () => {
                                                 variant="outlined"
                                                 sx={{
                                                     borderColor: activity.type === 'sample' ? '#1976d2' :
-                                                        activity.type === 'hot' ? '#ff6b35' :
-                                                            activity.type === 'download' ? '#4caf50' : '#9c27b0',
+                                                        activity.type === 'playlist' ? '#9c27b0' :
+                                                            activity.type === 'download' ? '#4caf50' : '#ff9800',
                                                     color: activity.type === 'sample' ? '#1976d2' :
-                                                        activity.type === 'hot' ? '#ff6b35' :
-                                                            activity.type === 'download' ? '#4caf50' : '#9c27b0'
+                                                        activity.type === 'playlist' ? '#9c27b0' :
+                                                            activity.type === 'download' ? '#4caf50' : '#ff9800'
                                                 }}
                                             />
                                         </ListItemSecondaryAction>
@@ -330,22 +330,22 @@ const Dashboard = () => {
                     </Card>
                 </Grid>
 
-                {/* HOT Playlists & System Status */}
+                {/* Latest Playlists & System Status */}
                 <Grid item xs={12} md={5}>
                     <Stack spacing={3}>
-                        {/* HOT Playlists */}
+                        {/* Latest Playlists */}
                         <Card>
                             <CardContent>
                                 <Box display="flex" alignItems="center" mb={2}>
-                                    <HotIcon sx={{ mr: 1, color: '#ff6b35' }} />
+                                    <CategoryIcon sx={{ mr: 1, color: '#9c27b0' }} />
                                     <Typography variant="h6" fontWeight="bold">
-                                        Aktif HOT Playlists
+                                        Son Eklenen Playlists
                                     </Typography>
                                 </Box>
                                 <Stack spacing={2}>
-                                    {hotPlaylists.filter(hot => hot.isActive).slice(0, 3).map((hot) => (
+                                    {latestPlaylists.slice(0, 3).map((playlist) => (
                                         <Box
-                                            key={hot._id}
+                                            key={playlist._id}
                                             sx={{
                                                 p: 2,
                                                 bgcolor: 'grey.50',
@@ -355,17 +355,17 @@ const Dashboard = () => {
                                             }}
                                         >
                                             <Typography variant="subtitle2" fontWeight="bold">
-                                                {hot.name}
+                                                {playlist.name}
                                             </Typography>
                                             <Box display="flex" alignItems="center" justifyContent="space-between" mt={1}>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    {hot.musicCount || 0} şarkı
+                                                    {playlist.musicCount || 0} şarkı
                                                 </Typography>
                                                 <Chip
-                                                    label={hot.category === 'all' ? 'All Genres' : hot.category}
+                                                    label={playlist.subCategory || 'N/A'}
                                                     size="small"
                                                     sx={{
-                                                        bgcolor: '#ff6b35',
+                                                        bgcolor: '#9c27b0',
                                                         color: 'white',
                                                         fontWeight: 'bold'
                                                     }}
@@ -373,6 +373,11 @@ const Dashboard = () => {
                                             </Box>
                                         </Box>
                                     ))}
+                                    {latestPlaylists.length === 0 && (
+                                        <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
+                                            Henüz playlist eklenmemiş
+                                        </Typography>
+                                    )}
                                 </Stack>
                             </CardContent>
                         </Card>

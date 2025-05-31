@@ -8,7 +8,6 @@ import AddMusic from './pages/AddMusic';
 import Samples from './pages/Samples';
 import UploadSample from './pages/UploadSample';
 import Playlists from './pages/Playlists';
-import Hot from './pages/Hot';
 
 // Modern tema oluştur
 const theme = createTheme({
@@ -133,7 +132,6 @@ function App() {
                             <Route path="samples" element={<Samples />} />
                             <Route path="upload" element={<UploadSample />} />
                             <Route path="playlists" element={<Playlists />} />
-                            <Route path="hot" element={<Hot />} />
                             <Route path="settings" element={<div>Settings sayfası yakında...</div>} />
                         </Route>
                     </Routes>
