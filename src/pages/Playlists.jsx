@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -49,7 +49,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const Playlists = () => {
+export const Playlists = () => {
     const [playlists, setPlaylists] = useState([]);
     const [musics, setMusics] = useState([]);
     const [filteredMusics, setFilteredMusics] = useState([]);
@@ -112,7 +112,7 @@ const Playlists = () => {
         }
     };
 
-    const filterMusics = () => {
+    const filterMusics = useCallback(() => {
         let filtered = musics;
 
         // Category filter
@@ -129,12 +129,12 @@ const Playlists = () => {
         }
 
         setFilteredMusics(filtered);
-    };
+    }, [musics, selectedMusicCategory, musicSearchTerm]);
 
-    const handleInputChange = (e) => {
+    const handleInputChange = useCallback((e) => {
         const { name, value } = e.target;
         setPlaylistForm(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
 
     const validateForm = () => {
         if (!playlistForm.name.trim()) {
@@ -180,7 +180,7 @@ const Playlists = () => {
             if (error.response?.data?.message?.includes('Duplicate')) {
                 setError('Bu kategori ve alt kategori kombinasyonu zaten mevcut');
             } else {
-                setError('Admin playlist kaydedilirken hata oluştu');
+                setError('Admin playlist kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message));
             }
         }
     };
@@ -200,7 +200,7 @@ const Playlists = () => {
     const handleDelete = async (id) => {
         if (window.confirm('Bu admin playlist\'i silmek istediğinizden emin misiniz?')) {
             try {
-                await axios.delete(`http://localhost:5000/api/playlists/${id}`);
+                await axios.delete(`http://localhost:5000/api/playlists/admin/${id}`);
                 setSuccess('Admin playlist başarıyla silindi');
                 fetchPlaylists();
             } catch (error) {
@@ -236,6 +236,7 @@ const Playlists = () => {
         setEditingPlaylist(null);
         setOpenDialog(false);
         setError(null);
+        setTabValue(0);
     };
 
     const getCategoryColor = (category) => {
@@ -354,7 +355,6 @@ const Playlists = () => {
                                     value={filterCategory}
                                     label="Ana Kategori Filtresi"
                                     onChange={(e) => setFilterCategory(e.target.value)}
-                                    startAdornment={<FilterIcon sx={{ mr: 1 }} />}
                                 >
                                     {categories.map(category => (
                                         <MenuItem key={category.value} value={category.value}>
@@ -672,3 +672,5 @@ const Playlists = () => {
         </Box>
     );
 };
+
+export default Playlists;

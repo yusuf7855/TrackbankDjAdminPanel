@@ -7,7 +7,8 @@ import Dashboard from './pages/Dashboard';
 import AddMusic from './pages/AddMusic';
 import Samples from './pages/Samples';
 import UploadSample from './pages/UploadSample';
-import Playlists from './pages/Playlists';
+import {Playlists} from "./pages/Playlists.jsx";
+
 
 // Modern tema oluştur
 const theme = createTheme({
