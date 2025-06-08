@@ -65,11 +65,11 @@ export const Playlists = () => {
     const [selectedMusicCategory, setSelectedMusicCategory] = useState('all');
     const [tabValue, setTabValue] = useState(0);
 
-    // Form state - BASIT OBJE
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [genre, setGenre] = useState('afrohouse');
-    const [subCategory, setSubCategory] = useState('');
+    // Form state - Her input için ayrı state
+    const [playlistName, setPlaylistName] = useState('');
+    const [playlistDescription, setPlaylistDescription] = useState('');
+    const [playlistGenre, setPlaylistGenre] = useState('afrohouse');
+    const [playlistSubCategory, setPlaylistSubCategory] = useState('');
 
     // Kategori listesi
     const categories = useMemo(() => [
@@ -130,11 +130,11 @@ export const Playlists = () => {
     }, [filterMusics]);
 
     const validateForm = useCallback(() => {
-        if (!name?.trim()) {
+        if (!playlistName?.trim()) {
             setError('Playlist adı gereklidir');
             return false;
         }
-        if (!subCategory?.trim()) {
+        if (!playlistSubCategory?.trim()) {
             setError('Alt kategori kodu gereklidir (örn: AH1, MH1)');
             return false;
         }
@@ -147,17 +147,17 @@ export const Playlists = () => {
             return false;
         }
         return true;
-    }, [name, subCategory, selectedMusics.length]);
+    }, [playlistName, playlistSubCategory, selectedMusics.length]);
 
     const handleSubmit = useCallback(async () => {
         if (!validateForm()) return;
 
         try {
             const data = {
-                name,
-                description,
-                genre,
-                subCategory,
+                name: playlistName,
+                description: playlistDescription,
+                genre: playlistGenre,
+                subCategory: playlistSubCategory,
                 musicIds: selectedMusics
             };
 
@@ -179,14 +179,14 @@ export const Playlists = () => {
                 setError('Admin playlist kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message));
             }
         }
-    }, [validateForm, name, description, genre, subCategory, selectedMusics, editingPlaylist, fetchPlaylists]);
+    }, [validateForm, playlistName, playlistDescription, playlistGenre, playlistSubCategory, selectedMusics, editingPlaylist, fetchPlaylists]);
 
     const handleEdit = useCallback((playlist) => {
         setEditingPlaylist(playlist);
-        setName(playlist.name || '');
-        setDescription(playlist.description || '');
-        setGenre(playlist.genre || 'afrohouse');
-        setSubCategory(playlist.subCategory || '');
+        setPlaylistName(playlist.name || '');
+        setPlaylistDescription(playlist.description || '');
+        setPlaylistGenre(playlist.genre || 'afrohouse');
+        setPlaylistSubCategory(playlist.subCategory || '');
         setSelectedMusics(playlist.musics?.map(m => m._id) || []);
         setOpenDialog(true);
     }, []);
@@ -220,10 +220,10 @@ export const Playlists = () => {
     }, []);
 
     const resetForm = useCallback(() => {
-        setName('');
-        setDescription('');
-        setGenre('afrohouse');
-        setSubCategory('');
+        setPlaylistName('');
+        setPlaylistDescription('');
+        setPlaylistGenre('afrohouse');
+        setPlaylistSubCategory('');
         setSelectedMusics([]);
         setEditingPlaylist(null);
         setOpenDialog(false);
@@ -502,17 +502,18 @@ export const Playlists = () => {
                                 <TextField
                                     fullWidth
                                     label="Admin Playlist Adı"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
+                                    value={playlistName}
+                                    onChange={(e) => setPlaylistName(e.target.value)}
                                     required
+                                    autoFocus={tabValue === 0}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
                                     label="Alt Kategori Kodu"
-                                    value={subCategory}
-                                    onChange={(e) => setSubCategory(e.target.value.toUpperCase())}
+                                    value={playlistSubCategory}
+                                    onChange={(e) => setPlaylistSubCategory(e.target.value.toUpperCase())}
                                     placeholder="AH1, MH1, ID1..."
                                     required
                                 />
@@ -521,9 +522,9 @@ export const Playlists = () => {
                                 <FormControl fullWidth>
                                     <InputLabel>Genre</InputLabel>
                                     <Select
-                                        value={genre}
+                                        value={playlistGenre}
                                         label="Genre"
-                                        onChange={(e) => setGenre(e.target.value)}
+                                        onChange={(e) => setPlaylistGenre(e.target.value)}
                                         required
                                     >
                                         {categories.filter(c => c.value !== 'all').map(category => (
@@ -549,8 +550,8 @@ export const Playlists = () => {
                                 <TextField
                                     fullWidth
                                     label="Açıklama"
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
+                                    value={playlistDescription}
+                                    onChange={(e) => setPlaylistDescription(e.target.value)}
                                     multiline
                                     rows={3}
                                     placeholder="Bu admin playlist hakkında kısa bir açıklama yazın..."
