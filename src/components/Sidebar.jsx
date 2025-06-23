@@ -1,3 +1,4 @@
+// src/components/Sidebar.jsx
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -16,17 +17,20 @@ import {
 } from '@mui/material';
 import {
     Dashboard as DashboardIcon,
-    MusicNote as SamplesIcon,
+    MusicNote as MusicNoteIcon,
     CloudUpload as UploadIcon,
     PlaylistPlay as PlaylistsIcon,
+    PlaylistAdd as PlaylistAddIcon,
     Settings as SettingsIcon,
-    Analytics as AnalyticsIcon
+    Analytics as AnalyticsIcon,
+    LibraryMusic as LibraryMusicIcon,
+    People as PeopleIcon,
+    Whatshot as HotIcon
 } from '@mui/icons-material';
-import MusicNoteIcon from '@mui/icons-material/MusicNote';
 
 const drawerWidth = 280;
 
-const Sidebar = () => {
+const Sidebar = ({ mobileOpen, onMobileClose }) => {
     const location = useLocation();
 
     const menuItems = [
@@ -34,57 +38,57 @@ const Sidebar = () => {
             text: 'Dashboard',
             icon: <DashboardIcon />,
             path: '/',
-            description: 'Genel görünüm'
+            description: 'Genel görünüm',
+            color: '#2196f3'
         },
         {
             text: 'Add Music',
             icon: <MusicNoteIcon />,
             path: '/add-music',
             description: 'Müzik ekle',
+            color: '#4caf50',
             isNew: true
         },
         {
-            text: 'Sample Library',
-            icon: <SamplesIcon />,
-            path: '/samples',
-            description: 'Ses örnekleri'
-        },
-        {
-            text: 'Upload Sample',
-            icon: <UploadIcon />,
-            path: '/upload',
-            description: 'Yeni sample yükle'
-        },
-        {
-            text: 'Genre Playlists', // Category Playlists -> Genre Playlists
-            icon: <PlaylistsIcon />,
+            text: 'Genre Playlists',
+            icon: <PlaylistAddIcon />,
             path: '/playlists',
-            description: 'Genre playlist\'leri', // Kategori -> Genre
-            isUpdated: true
+            description: 'Genre playlist\'leri',
+            color: '#9c27b0'
+        },
+        {
+            text: 'Sample Bank',
+            icon: <LibraryMusicIcon />,
+            path: '/sample-bank',
+            description: 'Sample yönetimi',
+            color: '#e91e63',
+            isNew: true
+        },
+        {
+            text: 'HOT Playlists',
+            icon: <HotIcon />,
+            path: '/hot',
+            description: 'Popüler içerikler',
+            color: '#ff5722'
+        },
+        {
+            text: 'Users',
+            icon: <PeopleIcon />,
+            path: '/users',
+            description: 'Kullanıcı yönetimi',
+            color: '#607d8b'
         },
         {
             text: 'Settings',
             icon: <SettingsIcon />,
             path: '/settings',
-            description: 'Ayarlar'
+            description: 'Sistem ayarları',
+            color: '#795548'
         }
     ];
 
-    return (
-        <Drawer
-            variant="permanent"
-            sx={{
-                width: drawerWidth,
-                flexShrink: 0,
-                '& .MuiDrawer-paper': {
-                    width: drawerWidth,
-                    boxSizing: 'border-box',
-                    bgcolor: 'background.paper',
-                    borderRight: '1px solid',
-                    borderColor: 'divider',
-                }
-            }}
-        >
+    const drawerContent = (
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <Box sx={{ p: 3, pb: 2 }}>
                 <Box display="flex" alignItems="center" mb={2}>
@@ -132,7 +136,7 @@ const Sidebar = () => {
             <Divider />
 
             {/* Navigation Menu */}
-            <List sx={{ px: 2, py: 1 }}>
+            <List sx={{ px: 2, py: 1, flex: 1 }}>
                 {menuItems.map((item) => (
                     <ListItem
                         key={item.text}
@@ -143,6 +147,7 @@ const Sidebar = () => {
                             component={Link}
                             to={item.path}
                             selected={location.pathname === item.path}
+                            onClick={onMobileClose}
                             sx={{
                                 borderRadius: 2,
                                 py: 1.5,
@@ -168,7 +173,7 @@ const Sidebar = () => {
                             <ListItemIcon
                                 sx={{
                                     minWidth: 44,
-                                    color: location.pathname === item.path ? 'white' : 'text.secondary'
+                                    color: location.pathname === item.path ? 'white' : item.color
                                 }}
                             >
                                 {item.icon}
@@ -185,10 +190,8 @@ const Sidebar = () => {
                                             </Typography>
                                             <Typography
                                                 variant="caption"
-                                                sx={{
-                                                    opacity: 0.7,
-                                                    color: location.pathname === item.path ? 'white' : 'text.secondary'
-                                                }}
+                                                color={location.pathname === item.path ? 'rgba(255,255,255,0.8)' : 'text.secondary'}
+                                                sx={{ display: 'block', lineHeight: 1.2 }}
                                             >
                                                 {item.description}
                                             </Typography>
@@ -200,7 +203,7 @@ const Sidebar = () => {
                                                 sx={{
                                                     height: 20,
                                                     fontSize: '0.7rem',
-                                                    bgcolor: '#ff6b35',
+                                                    bgcolor: '#4caf50',
                                                     color: 'white',
                                                     fontWeight: 'bold'
                                                 }}
@@ -208,12 +211,12 @@ const Sidebar = () => {
                                         )}
                                         {item.isUpdated && (
                                             <Chip
-                                                label="UPDATED"
+                                                label="UPD"
                                                 size="small"
                                                 sx={{
                                                     height: 20,
                                                     fontSize: '0.7rem',
-                                                    bgcolor: '#4caf50',
+                                                    bgcolor: '#ff9800',
                                                     color: 'white',
                                                     fontWeight: 'bold'
                                                 }}
@@ -247,11 +250,36 @@ const Sidebar = () => {
                         <Typography variant="body2">Active Users</Typography>
                         <Chip label="2.4K" size="small" color="success" />
                     </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="body2">Total Downloads</Typography>
+                        <Chip label="8.7K" size="small" sx={{ bgcolor: '#e91e63', color: 'white' }} />
+                    </Box>
                 </Stack>
             </Box>
 
+            {/* System Info */}
+            <Box sx={{ p: 2 }}>
+                <Box
+                    sx={{
+                        p: 2,
+                        bgcolor: 'success.main',
+                        borderRadius: 2,
+                        background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
+                        color: 'white',
+                        textAlign: 'center'
+                    }}
+                >
+                    <Typography variant="body2" fontWeight="bold">
+                        🚀 System Status
+                    </Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                        All services running smoothly
+                    </Typography>
+                </Box>
+            </Box>
+
             {/* Footer */}
-            <Box sx={{ mt: 'auto', p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="body2" color="text.secondary" textAlign="center">
                     DJ Sample Bank v2.0
                 </Typography>
@@ -259,7 +287,54 @@ const Sidebar = () => {
                     © 2024 - Genre System
                 </Typography>
             </Box>
-        </Drawer>
+        </Box>
+    );
+
+    return (
+        <Box
+            component="nav"
+            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        >
+            {/* Mobile drawer */}
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={onMobileClose}
+                ModalProps={{
+                    keepMounted: true, // Better open performance on mobile.
+                }}
+                sx={{
+                    display: { xs: 'block', sm: 'none' },
+                    '& .MuiDrawer-paper': {
+                        boxSizing: 'border-box',
+                        width: drawerWidth,
+                        bgcolor: 'background.paper',
+                        borderRight: '1px solid',
+                        borderColor: 'divider',
+                    },
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+
+            {/* Desktop drawer */}
+            <Drawer
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', sm: 'block' },
+                    '& .MuiDrawer-paper': {
+                        boxSizing: 'border-box',
+                        width: drawerWidth,
+                        bgcolor: 'background.paper',
+                        borderRight: '1px solid',
+                        borderColor: 'divider',
+                    },
+                }}
+                open
+            >
+                {drawerContent}
+            </Drawer>
+        </Box>
     );
 };
 

@@ -8,6 +8,7 @@ import AddMusic from './pages/AddMusic';
 import Samples from './pages/Samples';
 import UploadSample from './pages/UploadSample';
 import {Playlists} from "./pages/Playlists.jsx";
+import SampleBank from "./pages/SampleBank.jsx";
 
 
 // Modern tema oluştur
@@ -132,6 +133,7 @@ function App() {
                             <Route path="add-music" element={<AddMusic />} />
                             <Route path="samples" element={<Samples />} />
                             <Route path="upload" element={<UploadSample />} />
+                            <Route path="/sample-bank" element={<SampleBank />} /> {/* YENİ ROUTE */}
                             <Route path="playlists" element={<Playlists />} />
                             <Route path="settings" element={<div>Settings sayfası yakında...</div>} />
                         </Route>
