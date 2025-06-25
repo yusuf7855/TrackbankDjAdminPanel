@@ -22,7 +22,7 @@ import {
     PlaylistPlay as PlaylistsIcon,
     PlaylistAdd as PlaylistAddIcon,
     Settings as SettingsIcon,
-    Analytics as AnalyticsIcon,
+    Notifications as NotificationsIcon,
     LibraryMusic as LibraryMusicIcon,
     People as PeopleIcon,
     Whatshot as HotIcon
@@ -70,6 +70,14 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
             path: '/hot',
             description: 'Popüler içerikler',
             color: '#ff5722'
+        },
+        {
+            text: 'Notifications',
+            icon: <NotificationsIcon />,
+            path: '/notifications',
+            description: 'Bildirim yönetimi',
+            color: '#9c27b0',
+            isNew: true
         },
         {
             text: 'Users',
