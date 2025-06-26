@@ -55,7 +55,7 @@ export default function Dashboard() {
     });
 
     const [recentActivity, setRecentActivity] = useState([]);
-    const [systemHealth, setSystemHealth] = useState({
+    const [systemHealth] = useState({
         status: 'healthy',
         uptime: '99.9%',
         responseTime: '245ms',
@@ -80,144 +80,40 @@ export default function Dashboard() {
         try {
             setError(null);
 
-            // Paralel olarak tüm verileri yükle
-            const [playlistsRes, samplesRes, storeRes, notificationsRes] = await Promise.all([
+            // API çağrıları (şimdilik mock veriler kullanılıyor)
+            await Promise.all([
                 fetch(`${API_BASE}/playlists/admin`).catch(() => ({ json: () => ({}) })),
                 fetch(`${API_BASE}/samples/stats`).catch(() => ({ json: () => ({}) })),
                 fetch(`${API_BASE}/store/admin/stats`).catch(() => ({ json: () => ({}) })),
                 fetch(`${API_BASE}/notifications/stats`).catch(() => ({ json: () => ({}) }))
             ]);
 
-            const [playlistsData, samplesData, storeData, notificationsData] = await Promise.all([
-                playlistsRes.json(),
-                samplesRes.json(),
-                storeRes.json(),
-                notificationsRes.json()
-            ]);
+            // Mock aktivite verisi (gerçek API'den gelecek)
+            const mockActivity = [
+                { id: 1, activity: 'Yeni playlist oluşturuldu', user: 'Admin', priority: 'info', time: '2 dakika önce' },
+                { id: 2, activity: 'Sample yüklendi', user: 'DJ_Producer', priority: 'success', time: '5 dakika önce' },
+                { id: 3, activity: 'İlan hakkı satın alındı', user: 'MusicLover23', priority: 'warning', time: '10 dakika önce' },
+                { id: 4, activity: 'Push bildirim gönderildi', user: 'Admin', priority: 'info', time: '15 dakika önce' },
+                { id: 5, activity: 'Yeni kullanıcı kaydı', user: 'NewUser_123', priority: 'success', time: '20 dakika önce' },
+            ];
 
-            // Stats güncelle
+            // Mock veriler (gerçek API'den gelecek)
             setStats({
-                playlists: {
-                    total: playlistsData.pagination?.total || 0,
-                    admin: playlistsData.playlists?.length || 0,
-                    user: Math.floor(Math.random() * 50) + 20 // Mock data
-                },
-                samples: {
-                    total: samplesData.totalSamples || 0,
-                    free: samplesData.freeSamples || 0,
-                    paid: samplesData.paidSamples || 0,
-                    downloads: samplesData.totalDownloads || 0
-                },
-                store: {
-                    totalListings: storeData.success ? storeData.stats.totalListings : 0,
-                    activeListings: storeData.success ? storeData.stats.activeListings : 0,
-                    revenue: storeData.success ? storeData.stats.totalRevenue : 0,
-                    expiredListings: storeData.success ? storeData.stats.expiredListings : 0
-                },
-                notifications: {
-                    sent: notificationsData.totalSent || 0,
-                    delivered: notificationsData.totalDelivered || 0,
-                    deliveryRate: notificationsData.totalSent > 0 ?
-                        Math.round((notificationsData.totalDelivered / notificationsData.totalSent) * 100) : 0
-                },
-                users: {
-                    total: 248, // Mock data
-                    active: 142, // Mock data
-                    newToday: 12 // Mock data
-                }
+                playlists: { total: 127, admin: 24, user: 103 },
+                samples: { total: 1547, free: 892, paid: 655, downloads: 12847 },
+                store: { totalListings: 89, activeListings: 67, revenue: 2750, expiredListings: 22 },
+                notifications: { sent: 156, delivered: 142, deliveryRate: 91.0 },
+                users: { total: 2847, active: 1892, newToday: 23 }
             });
 
-            // Recent activity mock data with more realistic content
-            setRecentActivity([
-                {
-                    type: 'store',
-                    message: 'Yeni ilan: "Pioneer DDJ-SZ2 Professional DJ Controller"',
-                    time: '2 dakika önce',
-                    user: 'dj_producer',
-                    priority: 'high'
-                },
-                {
-                    type: 'sample',
-                    message: 'Sample Pack yüklendi: "Deep House Vibes Vol.3"',
-                    time: '8 dakika önce',
-                    user: 'sound_engineer',
-                    priority: 'medium'
-                },
-                {
-                    type: 'playlist',
-                    message: 'Admin playlist güncellendi: "Melodic House MH23"',
-                    time: '15 dakika önce',
-                    user: 'admin',
-                    priority: 'low'
-                },
-                {
-                    type: 'notification',
-                    message: 'Push bildirim: "Yeni Sample Pack Yayında!" - 287 kullanıcı',
-                    time: '32 dakika önce',
-                    user: 'system',
-                    priority: 'medium'
-                },
-                {
-                    type: 'user',
-                    message: 'Yeni kullanıcı kaydı: "beat_maker_2024"',
-                    time: '1 saat önce',
-                    user: 'beat_maker_2024',
-                    priority: 'low'
-                },
-                {
-                    type: 'store',
-                    message: 'İlan süresi doldu: "Yamaha HS7 Studio Monitor"',
-                    time: '2 saat önce',
-                    user: 'music_studio',
-                    priority: 'medium'
-                }
-            ]);
-
-            // System health update
-            setSystemHealth({
-                status: 'healthy',
-                uptime: '99.97%',
-                responseTime: Math.floor(Math.random() * 100) + 200 + 'ms',
-                activeConnections: Math.floor(Math.random() * 50) + 120
-            });
+            setRecentActivity(mockActivity);
 
         } catch (error) {
-            console.error('Dashboard verileri yüklenirken hata:', error);
-            setError('Dashboard verileri yüklenirken bir hata oluştu');
+            console.error('Dashboard verileri yüklenemedi:', error);
+            setError('Veriler yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
             setRefreshing(false);
-        }
-    };
-
-    const getActivityIcon = (type) => {
-        switch (type) {
-            case 'store': return <StoreIcon sx={{ fontSize: 16 }} />;
-            case 'sample': return <SampleIcon sx={{ fontSize: 16 }} />;
-            case 'playlist': return <PlaylistIcon sx={{ fontSize: 16 }} />;
-            case 'notification': return <NotificationIcon sx={{ fontSize: 16 }} />;
-            case 'user': return <PeopleIcon sx={{ fontSize: 16 }} />;
-            default: return <DashboardIcon sx={{ fontSize: 16 }} />;
-        }
-    };
-
-    const getActivityColor = (type) => {
-        switch (type) {
-            case 'store': return '#48c78e';
-            case 'sample': return '#667eea';
-            case 'playlist': return '#764ba2';
-            case 'notification': return '#ffdd57';
-            case 'user': return '#f093fb';
-            default: return '#636e72';
-        }
-    };
-
-    const getPriorityColor = (priority) => {
-        switch (priority) {
-            case 'high': return 'error';
-            case 'medium': return 'warning';
-            case 'low': return 'success';
-            default: return 'default';
         }
     };
 
@@ -271,10 +167,10 @@ export default function Dashboard() {
                                 color="primary"
                                 disabled={refreshing}
                                 sx={{
-                                    animation: refreshing ? 'spin 1s linear infinite' : 'none',
-                                    '@keyframes spin': {
-                                        '0%': { transform: 'rotate(0deg)' },
-                                        '100%': { transform: 'rotate(360deg)' }
+                                    animation: refreshing ? 'rotation 2s infinite linear' : '',
+                                    '@keyframes rotation': {
+                                        from: { transform: 'rotate(0deg)' },
+                                        to: { transform: 'rotate(360deg)' }
                                     }
                                 }}
                             >
@@ -285,53 +181,27 @@ export default function Dashboard() {
                 </Box>
             </Fade>
 
-            {/* Error Alert */}
             {error && (
-                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-                    {error}
-                </Alert>
+                <Fade in>
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {error}
+                    </Alert>
+                </Fade>
             )}
 
-            {/* System Health */}
-            <Grow in timeout={600}>
-                <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white' }}>
-                    <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
-                                    <PsychologyIcon />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="h6" fontWeight="bold">
-                                        Sistem Durumu: {systemHealth.status === 'healthy' ? 'Sağlıklı' : 'Sorunlu'}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        Uptime: {systemHealth.uptime} | Aktif Bağlantı: {systemHealth.activeConnections}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                            <Chip
-                                label="🟢 Online"
-                                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                            />
-                        </Box>
-                    </CardContent>
-                </Card>
-            </Grow>
-
-            {/* Main Stats Grid */}
+            {/* Main Stats Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {/* Playlists */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Grow in timeout={800}>
+                <Grid xs={12} sm={6} md={3}>
+                    <Fade in timeout={1000}>
                         <Card sx={{ height: '100%', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-4px)' } }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#764ba2', mr: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#667eea', mr: 2 }}>
                                         <PlaylistIcon />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="h4" fontWeight="bold" color="#764ba2">
+                                        <Typography variant="h4" fontWeight="bold" color="#667eea">
                                             {stats.playlists.total}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
@@ -339,26 +209,31 @@ export default function Dashboard() {
                                         </Typography>
                                     </Box>
                                 </Box>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                                     <Chip label={`Admin: ${stats.playlists.admin}`} size="small" color="primary" />
-                                    <Chip label={`Kullanıcı: ${stats.playlists.user}`} size="small" variant="outlined" />
+                                    <Chip label={`User: ${stats.playlists.user}`} size="small" color="secondary" />
                                 </Box>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={(stats.playlists.admin / stats.playlists.total) * 100}
+                                    sx={{ borderRadius: 2 }}
+                                />
                             </CardContent>
                         </Card>
-                    </Grow>
+                    </Fade>
                 </Grid>
 
                 {/* Samples */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Grow in timeout={1000}>
+                <Grid xs={12} sm={6} md={3}>
+                    <Grow in timeout={1200}>
                         <Card sx={{ height: '100%', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-4px)' } }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#667eea', mr: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#f093fb', mr: 2 }}>
                                         <SampleIcon />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="h4" fontWeight="bold" color="#667eea">
+                                        <Typography variant="h4" fontWeight="bold" color="#f093fb">
                                             {stats.samples.total}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
@@ -367,12 +242,14 @@ export default function Dashboard() {
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                                    <Chip label={`Ücretsiz: ${stats.samples.free}`} size="small" color="success" />
-                                    <Chip label={`Ücretli: ${stats.samples.paid}`} size="small" color="warning" />
+                                    <Chip label={`Free: ${stats.samples.free}`} size="small" color="success" />
+                                    <Chip label={`Paid: ${stats.samples.paid}`} size="small" color="warning" />
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <DownloadIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                    <Typography variant="caption">{stats.samples.downloads} indirme</Typography>
+                                    <DownloadIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+                                    <Typography variant="caption" color="primary.main">
+                                        {stats.samples.downloads.toLocaleString()} indirme
+                                    </Typography>
                                 </Box>
                             </CardContent>
                         </Card>
@@ -380,61 +257,49 @@ export default function Dashboard() {
                 </Grid>
 
                 {/* Store */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Grow in timeout={1200}>
-                        <Card sx={{
-                            height: '100%',
-                            transition: 'transform 0.3s',
-                            '&:hover': { transform: 'translateY(-4px)' },
-                            background: 'linear-gradient(135deg, #48c78e, #00b894)',
-                            color: 'white'
-                        }}>
+                <Grid xs={12} sm={6} md={3}>
+                    <Fade in timeout={1300}>
+                        <Card sx={{ height: '100%', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-4px)' } }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', mr: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#48c78e', mr: 2 }}>
                                         <StoreIcon />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="h4" fontWeight="bold">
+                                        <Typography variant="h4" fontWeight="bold" color="#48c78e">
                                             {stats.store.totalListings}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                        <Typography variant="body2" color="text.secondary">
                                             Toplam İlan
                                         </Typography>
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                                    <Chip
-                                        label={`Aktif: ${stats.store.activeListings}`}
-                                        size="small"
-                                        sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                                    />
-                                    <Chip
-                                        label={`Süresi Dolmuş: ${stats.store.expiredListings}`}
-                                        size="small"
-                                        sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'white' }}
-                                    />
+                                    <Chip label={`Aktif: ${stats.store.activeListings}`} size="small" color="success" />
+                                    <Chip label={`Süresi Dolmuş: ${stats.store.expiredListings}`} size="small" color="error" />
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <EuroIcon sx={{ fontSize: 14 }} />
-                                    <Typography variant="caption">€{stats.store.revenue.toFixed(2)} gelir</Typography>
+                                    <EuroIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                                    <Typography variant="caption" color="success.main">
+                                        {stats.store.revenue.toLocaleString()} TL gelir
+                                    </Typography>
                                 </Box>
                             </CardContent>
                         </Card>
-                    </Grow>
+                    </Fade>
                 </Grid>
 
                 {/* Users */}
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid xs={12} sm={6} md={3}>
                     <Grow in timeout={1400}>
                         <Card sx={{ height: '100%', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-4px)' } }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#f093fb', mr: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#ff7675', mr: 2 }}>
                                         <PeopleIcon />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="h4" fontWeight="bold" color="#f093fb">
+                                        <Typography variant="h4" fontWeight="bold" color="#ff7675">
                                             {stats.users.total}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
@@ -461,93 +326,107 @@ export default function Dashboard() {
             {/* Secondary Stats */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {/* Notifications */}
-                <Grid item xs={12} md={6}>
-                    <Fade in timeout={1000}>
+                <Grid xs={12} md={6}>
+                    <Fade in timeout={1500}>
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <NotificationIcon color="warning" />
-                                    Bildirim İstatistikleri
-                                </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#ffdd57', color: '#333' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#ffdd57', mr: 2 }}>
                                         <NotificationIcon />
                                     </Avatar>
-                                    <Box sx={{ flexGrow: 1 }}>
-                                        <Typography variant="h4" fontWeight="bold" color="#ffdd57">
-                                            {stats.notifications.sent}
+                                    <Box>
+                                        <Typography variant="h5" fontWeight="bold">
+                                            Bildirimler
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            Gönderilen Bildirim
+                                            Push bildirim istatistikleri
                                         </Typography>
                                     </Box>
                                 </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography variant="body2">Teslimat Oranı</Typography>
-                                    <Typography variant="body2" fontWeight="medium" color="success.main">
-                                        %{stats.notifications.deliveryRate}
-                                    </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" fontWeight="bold" color="primary.main">
+                                            {stats.notifications.sent}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Gönderilen
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" fontWeight="bold" color="success.main">
+                                            {stats.notifications.delivered}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Teslim Edilen
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" fontWeight="bold" color="info.main">
+                                            %{stats.notifications.deliveryRate}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Başarı Oranı
+                                        </Typography>
+                                    </Box>
                                 </Box>
                                 <LinearProgress
                                     variant="determinate"
                                     value={stats.notifications.deliveryRate}
-                                    sx={{
-                                        height: 8,
-                                        borderRadius: 4,
-                                        bgcolor: 'grey.200',
-                                        '& .MuiLinearProgress-bar': {
-                                            bgcolor: stats.notifications.deliveryRate > 90 ? 'success.main' :
-                                                stats.notifications.deliveryRate > 70 ? 'warning.main' : 'error.main'
-                                        }
-                                    }}
+                                    color="success"
+                                    sx={{ borderRadius: 2 }}
                                 />
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                    {stats.notifications.delivered} başarıyla teslim edildi
-                                </Typography>
                             </CardContent>
                         </Card>
                     </Fade>
                 </Grid>
 
-                {/* Revenue & Performance */}
-                <Grid item xs={12} md={6}>
-                    <Fade in timeout={1200}>
+                {/* Quick Actions */}
+                <Grid xs={12} md={6}>
+                    <Fade in timeout={1600}>
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <EuroIcon color="success" />
-                                    Gelir ve Performans
+                                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <PsychologyIcon color="primary" />
+                                    Hızlı İşlemler
                                 </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#48c78e' }}>
-                                        <TrendingUpIcon />
-                                    </Avatar>
-                                    <Box sx={{ flexGrow: 1 }}>
-                                        <Typography variant="h4" fontWeight="bold" color="#48c78e">
-                                            €{stats.store.revenue.toFixed(2)}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Toplam Gelir (İlan Hakları)
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                                    <Chip
-                                        icon={<LocalOfferIcon />}
-                                        label={`${stats.store.totalListings} İlan`}
-                                        color="success"
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<CloudUploadIcon />}
+                                        fullWidth
                                         size="small"
-                                    />
-                                    <Chip
-                                        icon={<AccessTimeIcon />}
-                                        label={`${stats.store.activeListings} Aktif`}
-                                        color="info"
+                                        sx={{ justifyContent: 'flex-start' }}
+                                    >
+                                        Yeni Sample Yükle
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<PlaylistIcon />}
+                                        fullWidth
                                         size="small"
-                                    />
+                                        sx={{ justifyContent: 'flex-start' }}
+                                    >
+                                        Playlist Oluştur
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<NotificationIcon />}
+                                        fullWidth
+                                        size="small"
+                                        sx={{ justifyContent: 'flex-start' }}
+                                    >
+                                        Bildirim Gönder
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<StoreIcon />}
+                                        fullWidth
+                                        size="small"
+                                        sx={{ justifyContent: 'flex-start' }}
+                                    >
+                                        İlan Hakkı Ver
+                                    </Button>
                                 </Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Ortalama ilan değeri: €{stats.store.totalListings > 0 ? (stats.store.revenue / stats.store.totalListings).toFixed(2) : '0.00'}
-                                </Typography>
                             </CardContent>
                         </Card>
                     </Fade>
@@ -556,7 +435,7 @@ export default function Dashboard() {
 
             {/* Recent Activity */}
             <Grid container spacing={3}>
-                <Grid item xs={12} lg={8}>
+                <Grid xs={12} lg={8}>
                     <Fade in timeout={1400}>
                         <Paper sx={{ p: 3 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -585,42 +464,22 @@ export default function Dashboard() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {recentActivity.map((activity, index) => (
-                                            <TableRow key={index} hover>
-                                                <TableCell>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        <Avatar sx={{
-                                                            bgcolor: getActivityColor(activity.type),
-                                                            width: 32,
-                                                            height: 32
-                                                        }}>
-                                                            {getActivityIcon(activity.type)}
-                                                        </Avatar>
-                                                        <Typography variant="body2">
-                                                            {activity.message}
-                                                        </Typography>
-                                                    </Box>
-                                                </TableCell>
+                                        {recentActivity.map((activity) => (
+                                            <TableRow key={activity.id} hover>
+                                                <TableCell>{activity.activity}</TableCell>
+                                                <TableCell>{activity.user}</TableCell>
                                                 <TableCell>
                                                     <Chip
-                                                        label={activity.user}
+                                                        label={activity.priority}
                                                         size="small"
-                                                        variant="outlined"
-                                                        sx={{ fontSize: '0.75rem' }}
+                                                        color={
+                                                            activity.priority === 'success' ? 'success' :
+                                                                activity.priority === 'warning' ? 'warning' :
+                                                                    activity.priority === 'error' ? 'error' : 'info'
+                                                        }
                                                     />
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        label={activity.priority.toUpperCase()}
-                                                        size="small"
-                                                        color={getPriorityColor(activity.priority)}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        {activity.time}
-                                                    </Typography>
-                                                </TableCell>
+                                                <TableCell>{activity.time}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -630,119 +489,48 @@ export default function Dashboard() {
                     </Fade>
                 </Grid>
 
-                {/* Quick Actions & System Info */}
-                <Grid item xs={12} lg={4}>
-                    <Grid container spacing={2}>
-                        {/* Quick Actions */}
-                        <Grid item xs={12}>
-                            <Fade in timeout={1600}>
-                                <Card>
-                                    <CardContent>
-                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <SpeedIcon color="primary" />
-                                            Hızlı İşlemler
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                            <Button
-                                                variant="outlined"
-                                                startIcon={<CloudUploadIcon />}
-                                                fullWidth
-                                                size="small"
-                                                sx={{ justifyContent: 'flex-start' }}
-                                            >
-                                                Yeni Sample Yükle
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                startIcon={<PlaylistIcon />}
-                                                fullWidth
-                                                size="small"
-                                                sx={{ justifyContent: 'flex-start' }}
-                                            >
-                                                Playlist Oluştur
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                startIcon={<NotificationIcon />}
-                                                fullWidth
-                                                size="small"
-                                                sx={{ justifyContent: 'flex-start' }}
-                                            >
-                                                Bildirim Gönder
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                startIcon={<StoreIcon />}
-                                                fullWidth
-                                                size="small"
-                                                sx={{ justifyContent: 'flex-start' }}
-                                            >
-                                                İlan Hakkı Ver
-                                            </Button>
-                                        </Box>
-                                    </CardContent>
-                                </Card>
-                            </Fade>
-                        </Grid>
-
-                        {/* System Resources */}
-                        <Grid item xs={12}>
-                            <Fade in timeout={1800}>
-                                <Card>
-                                    <CardContent>
-                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <PsychologyIcon color="secondary" />
-                                            Sistem Kaynakları
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                            <Box>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                                    <Typography variant="body2">CPU Kullanımı</Typography>
-                                                    <Typography variant="body2" fontWeight="medium">23%</Typography>
-                                                </Box>
-                                                <LinearProgress variant="determinate" value={23} sx={{ height: 6, borderRadius: 3 }} />
-                                            </Box>
-
-                                            <Box>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                                    <Typography variant="body2">Bellek Kullanımı</Typography>
-                                                    <Typography variant="body2" fontWeight="medium">67%</Typography>
-                                                </Box>
-                                                <LinearProgress
-                                                    variant="determinate"
-                                                    value={67}
-                                                    color="warning"
-                                                    sx={{ height: 6, borderRadius: 3 }}
-                                                />
-                                            </Box>
-
-                                            <Box>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                                    <Typography variant="body2">Disk Kullanımı</Typography>
-                                                    <Typography variant="body2" fontWeight="medium">45%</Typography>
-                                                </Box>
-                                                <LinearProgress
-                                                    variant="determinate"
-                                                    value={45}
-                                                    color="success"
-                                                    sx={{ height: 6, borderRadius: 3 }}
-                                                />
-                                            </Box>
-
-                                            <Box sx={{ pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Son güncelleme: {new Date().toLocaleTimeString('tr-TR')}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Uptime: {systemHealth.uptime}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    </CardContent>
-                                </Card>
-                            </Fade>
-                        </Grid>
-                    </Grid>
+                {/* System Health */}
+                <Grid xs={12} lg={4}>
+                    <Fade in timeout={1500}>
+                        <Paper sx={{ p: 3 }}>
+                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <SpeedIcon color="success" />
+                                Sistem Durumu
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Çalışma Süresi
+                                    </Typography>
+                                    <Typography variant="h6" color="success.main">
+                                        {systemHealth.uptime}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Yanıt Süresi
+                                    </Typography>
+                                    <Typography variant="h6" color="primary.main">
+                                        {systemHealth.responseTime}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Aktif Bağlantılar
+                                    </Typography>
+                                    <Typography variant="h6" color="info.main">
+                                        {systemHealth.activeConnections}
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    label={`Durum: ${systemHealth.status}`}
+                                    color="success"
+                                    variant="outlined"
+                                    sx={{ alignSelf: 'flex-start' }}
+                                />
+                            </Box>
+                        </Paper>
+                    </Fade>
                 </Grid>
             </Grid>
         </Box>

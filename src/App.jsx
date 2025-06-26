@@ -10,7 +10,7 @@ import UploadSample from './pages/UploadSample';
 import { Playlists } from "./pages/Playlists.jsx";
 import SampleBank from "./pages/SampleBank.jsx";
 import Notifications from "./pages/Notifications.jsx";
-import StoreManagement from "./pages/StoreManagement.jsx"; // YENİ: Store Management sayfası
+import StoreManagement from "./pages/StoreManagement.jsx";
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -25,7 +25,7 @@ const theme = createTheme({
             main: '#dc004e',
         },
         success: {
-            main: '#48c78e', // Store için yeşil renk
+            main: '#48c78e',
             light: '#81ecec',
             dark: '#00b894',
         },
@@ -40,7 +40,7 @@ const theme = createTheme({
             dark: '#d63031',
         },
         info: {
-            main: '#667eea', // Store management için mavi-mor
+            main: '#667eea',
             light: '#9c88ff',
             dark: '#764ba2',
         },
@@ -66,10 +66,6 @@ const theme = createTheme({
         h6: {
             fontWeight: 600,
         },
-        button: {
-            textTransform: 'none',
-            fontWeight: 600,
-        },
     },
     shape: {
         borderRadius: 12,
@@ -79,56 +75,20 @@ const theme = createTheme({
             styleOverrides: {
                 root: {
                     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                    border: '1px solid rgba(0,0,0,0.05)',
-                    transition: 'all 0.2s ease-in-out',
+                    borderRadius: 16,
                     '&:hover': {
                         boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                        transform: 'translateY(-2px)',
                     },
                 },
             },
         },
-        MuiButton: {
+        MuiPaper: {
             styleOverrides: {
                 root: {
-                    borderRadius: 8,
-                    padding: '8px 16px',
-                    boxShadow: 'none',
-                    '&:hover': {
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                    '&.MuiPaper-elevation1': {
+                        boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
                     },
-                },
-                contained: {
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: '#ffffff',
-                    '&:hover': {
-                        background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                    },
-                },
-            },
-        },
-        MuiChip: {
-            styleOverrides: {
-                root: {
-                    borderRadius: 6,
-                    fontWeight: 500,
-                },
-            },
-        },
-        MuiTableCell: {
-            styleOverrides: {
-                head: {
-                    backgroundColor: '#f8f9fa',
-                    fontWeight: 600,
-                    borderBottom: '2px solid #e9ecef',
-                },
-            },
-        },
-        MuiDrawer: {
-            styleOverrides: {
-                paper: {
-                    border: 'none',
-                    boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
                 },
             },
         },
@@ -139,7 +99,6 @@ const theme = createTheme({
                 },
             },
         },
-        // Store Management için özel stil
         MuiTableRow: {
             styleOverrides: {
                 root: {
@@ -169,13 +128,23 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Layout />}>
                             <Route index element={<Dashboard />} />
+                            <Route path="admin" element={<Dashboard />} />
+                            <Route path="admin/playlists" element={<Playlists />} />
+                            <Route path="admin/samples" element={<SampleBank />} />
+                            <Route path="admin/store" element={<StoreManagement />} />
+                            <Route path="admin/notifications" element={<Notifications />} />
+                            <Route path="admin/users" element={<div>Kullanıcılar sayfası yakında...</div>} />
+                            <Route path="admin/analytics" element={<div>Analytics sayfası yakında...</div>} />
+                            <Route path="admin/settings" element={<div>Settings sayfası yakında...</div>} />
+
+                            {/* Legacy routes (eski routelar) */}
                             <Route path="add-music" element={<AddMusic />} />
                             <Route path="samples" element={<Samples />} />
                             <Route path="upload" element={<UploadSample />} />
-                            <Route path="/sample-bank" element={<SampleBank />} />
+                            <Route path="sample-bank" element={<SampleBank />} />
                             <Route path="notifications" element={<Notifications />} />
                             <Route path="playlists" element={<Playlists />} />
-                            <Route path="store" element={<StoreManagement />} /> {/* YENİ: Store Management rotası */}
+                            <Route path="store" element={<StoreManagement />} />
                             <Route path="settings" element={<div>Settings sayfası yakında...</div>} />
                         </Route>
                     </Routes>
