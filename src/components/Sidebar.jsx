@@ -1,6 +1,4 @@
-// src/components/Sidebar.jsx
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import {
     Drawer,
     List,
@@ -8,223 +6,204 @@ import {
     ListItemButton,
     ListItemIcon,
     ListItemText,
-    Divider,
-    Box,
     Typography,
+    Box,
+    Divider,
     Avatar,
-    Chip,
-    Stack
+    Chip
 } from '@mui/material';
 import {
     Dashboard as DashboardIcon,
-    MusicNote as MusicNoteIcon,
-    CloudUpload as UploadIcon,
-    PlaylistPlay as PlaylistsIcon,
-    PlaylistAdd as PlaylistAddIcon,
+    QueueMusic as PlaylistIcon,
+    Notifications as NotificationIcon,
+    Store as StoreIcon,
+    LibraryMusic as SampleIcon,
     Settings as SettingsIcon,
-    Notifications as NotificationsIcon,
-    LibraryMusic as LibraryMusicIcon,
-    People as PeopleIcon,
-    Whatshot as HotIcon
+    People as UsersIcon,
+    Analytics as AnalyticsIcon,
+    AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
 
-const Sidebar = ({ mobileOpen, onMobileClose }) => {
-    const location = useLocation();
+const menuItems = [
+    {
+        title: 'Dashboard',
+        icon: <DashboardIcon />,
+        path: '/admin',
+        description: 'Genel Bakış',
+        color: '#667eea'
+    },
+    {
+        title: 'Playlist Yönetimi',
+        icon: <PlaylistIcon />,
+        path: '/admin/playlists',
+        description: 'Admin Playlist\'leri',
+        color: '#764ba2'
+    },
+    {
+        title: 'Sample Bank',
+        icon: <SampleIcon />,
+        path: '/admin/samples',
+        description: 'Sample Yönetimi',
+        color: '#f093fb'
+    },
+    {
+        title: 'Mağaza Yönetimi',
+        icon: <StoreIcon />,
+        path: '/admin/store',
+        description: 'İlan ve Hak Yönetimi',
+        color: '#48c78e',
+        isNew: true // Yeni özellik badge'i için
+    },
+    {
+        title: 'Bildirimler',
+        icon: <NotificationIcon />,
+        path: '/admin/notifications',
+        description: 'Push Bildirimleri',
+        color: '#ffdd57'
+    },
+    {
+        title: 'Kullanıcılar',
+        icon: <UsersIcon />,
+        path: '/admin/users',
+        description: 'Kullanıcı Yönetimi',
+        color: '#ff7675'
+    },
+    {
+        title: 'Analytics',
+        icon: <AnalyticsIcon />,
+        path: '/admin/analytics',
+        description: 'İstatistikler',
+        color: '#00b894'
+    },
+    {
+        title: 'Ayarlar',
+        icon: <SettingsIcon />,
+        path: '/admin/settings',
+        description: 'Sistem Ayarları',
+        color: '#636e72'
+    }
+];
 
-    const menuItems = [
-        {
-            text: 'Dashboard',
-            icon: <DashboardIcon />,
-            path: '/',
-            description: 'Genel görünüm',
-            color: '#2196f3'
-        },
-        {
-            text: 'Add Music',
-            icon: <MusicNoteIcon />,
-            path: '/add-music',
-            description: 'Müzik ekle',
-            color: '#4caf50',
-            isNew: true
-        },
-        {
-            text: 'Genre Playlists',
-            icon: <PlaylistAddIcon />,
-            path: '/playlists',
-            description: 'Genre playlist\'leri',
-            color: '#9c27b0'
-        },
-        {
-            text: 'Sample Bank',
-            icon: <LibraryMusicIcon />,
-            path: '/sample-bank',
-            description: 'Sample yönetimi',
-            color: '#e91e63',
-            isNew: true
-        },
-        {
-            text: 'HOT Playlists',
-            icon: <HotIcon />,
-            path: '/hot',
-            description: 'Popüler içerikler',
-            color: '#ff5722'
-        },
-        {
-            text: 'Notifications',
-            icon: <NotificationsIcon />,
-            path: '/notifications',
-            description: 'Bildirim yönetimi',
-            color: '#9c27b0',
-            isNew: true
-        },
-        {
-            text: 'Users',
-            icon: <PeopleIcon />,
-            path: '/users',
-            description: 'Kullanıcı yönetimi',
-            color: '#607d8b'
-        },
-        {
-            text: 'Settings',
-            icon: <SettingsIcon />,
-            path: '/settings',
-            description: 'Sistem ayarları',
-            color: '#795548'
-        }
-    ];
-
-    const drawerContent = (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <Box sx={{ p: 3, pb: 2 }}>
-                <Box display="flex" alignItems="center" mb={2}>
-                    <Avatar
-                        sx={{
-                            width: 48,
-                            height: 48,
-                            mr: 2,
-                            bgcolor: 'primary.main',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            fontWeight: 'bold',
-                            fontSize: '1.2rem'
-                        }}
-                    >
-                        DJ
-                    </Avatar>
-                    <Box>
-                        <Typography variant="h6" noWrap fontWeight="bold">
-                            DJ Sample Bank
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Admin Panel
-                        </Typography>
-                    </Box>
-                </Box>
-
-                <Box
+export default function AdminSidebar({ currentPath, onNavigate }) {
+    return (
+        <Drawer
+            variant="permanent"
+            sx={{
+                width: drawerWidth,
+                flexShrink: 0,
+                '& .MuiDrawer-paper': {
+                    width: drawerWidth,
+                    boxSizing: 'border-box',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    borderRight: 'none',
+                    boxShadow: '4px 0 20px rgba(0,0,0,0.1)'
+                },
+            }}
+        >
+            {/* Logo/Header */}
+            <Box sx={{
+                p: 3,
+                textAlign: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.05)'
+            }}>
+                <Avatar
                     sx={{
-                        p: 2,
-                        bgcolor: 'primary.main',
-                        borderRadius: 2,
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white'
+                        width: 60,
+                        height: 60,
+                        mx: 'auto',
+                        mb: 2,
+                        background: 'rgba(255,255,255,0.2)',
+                        fontSize: '2rem'
                     }}
                 >
-                    <Typography variant="body2" fontWeight="bold">
-                        🎵 Music Management
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                        Genre tabanlı müzik yönetim sistemi
-                    </Typography>
-                </Box>
+                    🎵
+                </Avatar>
+                <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                    DJ Mobile Admin
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: '0.85rem' }}>
+                    Yönetim Paneli v1.0
+                </Typography>
+                <Chip
+                    label="Admin"
+                    size="small"
+                    icon={<AdminIcon sx={{ fontSize: '0.8rem !important' }} />}
+                    sx={{
+                        mt: 1,
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        fontSize: '0.75rem'
+                    }}
+                />
             </Box>
 
-            <Divider />
-
             {/* Navigation Menu */}
-            <List sx={{ px: 2, py: 1, flex: 1 }}>
+            <List sx={{ flex: 1, p: 2 }}>
                 {menuItems.map((item) => (
-                    <ListItem
-                        key={item.text}
-                        disablePadding
-                        sx={{ mb: 1 }}
-                    >
+                    <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
                         <ListItemButton
-                            component={Link}
-                            to={item.path}
-                            selected={location.pathname === item.path}
-                            onClick={onMobileClose}
+                            onClick={() => onNavigate(item.path)}
+                            selected={currentPath === item.path}
                             sx={{
                                 borderRadius: 2,
                                 py: 1.5,
                                 px: 2,
+                                position: 'relative',
+                                transition: 'all 0.3s ease',
                                 '&.Mui-selected': {
-                                    bgcolor: 'primary.main',
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                    color: 'white',
-                                    '& .MuiListItemIcon-root': {
-                                        color: 'white'
-                                    },
+                                    bgcolor: 'rgba(255,255,255,0.2)',
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                                    transform: 'translateX(5px)',
                                     '&:hover': {
-                                        bgcolor: 'primary.dark',
-                                        background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                                        bgcolor: 'rgba(255,255,255,0.25)',
+                                    },
+                                    '&::before': {
+                                        content: '""',
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: 4,
+                                        height: '60%',
+                                        bgcolor: 'white',
+                                        borderRadius: '0 2px 2px 0'
                                     }
                                 },
                                 '&:hover': {
-                                    bgcolor: 'action.hover',
-                                    borderRadius: 2,
+                                    bgcolor: 'rgba(255,255,255,0.1)',
+                                    transform: 'translateX(3px)',
                                 }
                             }}
                         >
                             <ListItemIcon
                                 sx={{
-                                    minWidth: 44,
-                                    color: location.pathname === item.path ? 'white' : item.color
+                                    color: 'inherit',
+                                    minWidth: 40,
+                                    '& .MuiSvgIcon-root': {
+                                        fontSize: '1.3rem'
+                                    }
                                 }}
                             >
                                 {item.icon}
                             </ListItemIcon>
                             <ListItemText
                                 primary={
-                                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                                        <Box>
-                                            <Typography
-                                                variant="body2"
-                                                fontWeight={location.pathname === item.path ? 'bold' : 'medium'}
-                                            >
-                                                {item.text}
-                                            </Typography>
-                                            <Typography
-                                                variant="caption"
-                                                color={location.pathname === item.path ? 'rgba(255,255,255,0.8)' : 'text.secondary'}
-                                                sx={{ display: 'block', lineHeight: 1.2 }}
-                                            >
-                                                {item.description}
-                                            </Typography>
-                                        </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="body1" fontWeight="medium" sx={{ fontSize: '0.9rem' }}>
+                                            {item.title}
+                                        </Typography>
                                         {item.isNew && (
                                             <Chip
-                                                label="NEW"
+                                                label="YENİ"
                                                 size="small"
                                                 sx={{
-                                                    height: 20,
-                                                    fontSize: '0.7rem',
-                                                    bgcolor: '#4caf50',
-                                                    color: 'white',
-                                                    fontWeight: 'bold'
-                                                }}
-                                            />
-                                        )}
-                                        {item.isUpdated && (
-                                            <Chip
-                                                label="UPD"
-                                                size="small"
-                                                sx={{
-                                                    height: 20,
-                                                    fontSize: '0.7rem',
-                                                    bgcolor: '#ff9800',
+                                                    height: 16,
+                                                    fontSize: '0.6rem',
+                                                    bgcolor: '#48c78e',
                                                     color: 'white',
                                                     fontWeight: 'bold'
                                                 }}
@@ -232,118 +211,90 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
                                         )}
                                     </Box>
                                 }
+                                secondary={
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            opacity: 0.8,
+                                            fontSize: '0.75rem',
+                                            mt: 0.2
+                                        }}
+                                    >
+                                        {item.description}
+                                    </Typography>
+                                }
                             />
                         </ListItemButton>
                     </ListItem>
                 ))}
             </List>
 
-            <Divider sx={{ mx: 2 }} />
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
 
             {/* Quick Stats */}
-            <Box sx={{ p: 2, mt: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    📊 Quick Stats
-                </Typography>
-                <Stack spacing={1}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Total Samples</Typography>
-                        <Chip label="124" size="small" variant="outlined" />
-                    </Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Genre Playlists</Typography>
-                        <Chip label="15" size="small" sx={{ bgcolor: '#9c27b0', color: 'white' }} />
-                    </Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Active Users</Typography>
-                        <Chip label="2.4K" size="small" color="success" />
-                    </Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Total Downloads</Typography>
-                        <Chip label="8.7K" size="small" sx={{ bgcolor: '#e91e63', color: 'white' }} />
-                    </Box>
-                </Stack>
-            </Box>
-
-            {/* System Info */}
             <Box sx={{ p: 2 }}>
-                <Box
-                    sx={{
-                        p: 2,
-                        bgcolor: 'success.main',
-                        borderRadius: 2,
-                        background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
-                        color: 'white',
-                        textAlign: 'center'
-                    }}
-                >
-                    <Typography variant="body2" fontWeight="bold">
-                        🚀 System Status
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                        All services running smoothly
-                    </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.6, mb: 1, fontSize: '0.75rem' }}>
+                    Hızlı İstatistikler
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
+                            Aktif Kullanıcılar
+                        </Typography>
+                        <Chip
+                            label="142"
+                            size="small"
+                            sx={{
+                                bgcolor: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                height: 20
+                            }}
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
+                            Günlük İndirme
+                        </Typography>
+                        <Chip
+                            label="89"
+                            size="small"
+                            sx={{
+                                bgcolor: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                height: 20
+                            }}
+                        />
+                    </Box>
                 </Box>
             </Box>
 
             {/* Footer */}
-            <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="body2" color="text.secondary" textAlign="center">
-                    DJ Sample Bank v2.0
+            <Box sx={{
+                p: 2,
+                borderTop: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(0,0,0,0.1)'
+            }}>
+                <Typography variant="body2" sx={{ opacity: 0.6, textAlign: 'center', fontSize: '0.75rem' }}>
+                    DJ Mobile App v1.0
                 </Typography>
-                <Typography variant="caption" color="text.secondary" textAlign="center" display="block">
-                    © 2024 - Genre System
+                <Typography variant="body2" sx={{ opacity: 0.6, textAlign: 'center', fontSize: '0.65rem' }}>
+                    © 2024 Admin Panel
                 </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                    <Chip
+                        label="🟢 Online"
+                        size="small"
+                        sx={{
+                            bgcolor: 'rgba(72, 199, 142, 0.2)',
+                            color: '#48c78e',
+                            fontSize: '0.65rem',
+                            height: 18
+                        }}
+                    />
+                </Box>
             </Box>
-        </Box>
+        </Drawer>
     );
-
-    return (
-        <Box
-            component="nav"
-            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        >
-            {/* Mobile drawer */}
-            <Drawer
-                variant="temporary"
-                open={mobileOpen}
-                onClose={onMobileClose}
-                ModalProps={{
-                    keepMounted: true, // Better open performance on mobile.
-                }}
-                sx={{
-                    display: { xs: 'block', sm: 'none' },
-                    '& .MuiDrawer-paper': {
-                        boxSizing: 'border-box',
-                        width: drawerWidth,
-                        bgcolor: 'background.paper',
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                    },
-                }}
-            >
-                {drawerContent}
-            </Drawer>
-
-            {/* Desktop drawer */}
-            <Drawer
-                variant="permanent"
-                sx={{
-                    display: { xs: 'none', sm: 'block' },
-                    '& .MuiDrawer-paper': {
-                        boxSizing: 'border-box',
-                        width: drawerWidth,
-                        bgcolor: 'background.paper',
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                    },
-                }}
-                open
-            >
-                {drawerContent}
-            </Drawer>
-        </Box>
-    );
-};
-
-export default Sidebar;
+}

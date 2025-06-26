@@ -7,12 +7,12 @@ import Dashboard from './pages/Dashboard';
 import AddMusic from './pages/AddMusic';
 import Samples from './pages/Samples';
 import UploadSample from './pages/UploadSample';
-import {Playlists} from "./pages/Playlists.jsx";
+import { Playlists } from "./pages/Playlists.jsx";
 import SampleBank from "./pages/SampleBank.jsx";
 import Notifications from "./pages/Notifications.jsx";
+import StoreManagement from "./pages/StoreManagement.jsx"; // YENİ: Store Management sayfası
 
-
-// Modern tema oluştur
+// Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
     palette: {
         mode: 'light',
@@ -23,6 +23,26 @@ const theme = createTheme({
         },
         secondary: {
             main: '#dc004e',
+        },
+        success: {
+            main: '#48c78e', // Store için yeşil renk
+            light: '#81ecec',
+            dark: '#00b894',
+        },
+        warning: {
+            main: '#ffdd57',
+            light: '#fff3cd',
+            dark: '#fdcb6e',
+        },
+        error: {
+            main: '#ff7675',
+            light: '#fab1a0',
+            dark: '#d63031',
+        },
+        info: {
+            main: '#667eea', // Store management için mavi-mor
+            light: '#9c88ff',
+            dark: '#764ba2',
         },
         background: {
             default: '#f5f5f5',
@@ -119,6 +139,24 @@ const theme = createTheme({
                 },
             },
         },
+        // Store Management için özel stil
+        MuiTableRow: {
+            styleOverrides: {
+                root: {
+                    '&:hover': {
+                        backgroundColor: 'rgba(102, 126, 234, 0.04)',
+                    },
+                },
+            },
+        },
+        MuiLinearProgress: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 4,
+                    height: 8,
+                },
+            },
+        },
     },
 });
 
@@ -135,8 +173,9 @@ function App() {
                             <Route path="samples" element={<Samples />} />
                             <Route path="upload" element={<UploadSample />} />
                             <Route path="/sample-bank" element={<SampleBank />} />
-                            <Route path="notifications" element={<Notifications />} />  {/* YENİ */}
+                            <Route path="notifications" element={<Notifications />} />
                             <Route path="playlists" element={<Playlists />} />
+                            <Route path="store" element={<StoreManagement />} /> {/* YENİ: Store Management rotası */}
                             <Route path="settings" element={<div>Settings sayfası yakında...</div>} />
                         </Route>
                     </Routes>
