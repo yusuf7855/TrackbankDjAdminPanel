@@ -57,27 +57,48 @@ const theme = createTheme({
         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
         h4: {
             fontWeight: 700,
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.5px',
         },
         h5: {
             fontWeight: 600,
-            letterSpacing: '-0.01em',
         },
         h6: {
-            fontWeight: 600,
+            fontWeight: 500,
         },
-    },
-    shape: {
-        borderRadius: 12,
+        button: {
+            textTransform: 'none',
+            fontWeight: 500,
+        },
     },
     components: {
         MuiCard: {
             styleOverrides: {
                 root: {
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                    borderRadius: 16,
+                    borderRadius: 12,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease-in-out',
                     '&:hover': {
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    },
+                },
+            },
+        },
+        MuiButton: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 8,
+                    padding: '10px 24px',
+                },
+                contained: {
+                    boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
+                },
+            },
+        },
+        MuiTextField: {
+            styleOverrides: {
+                root: {
+                    '& .MuiOutlinedInput-root': {
+                        borderRadius: 8,
                     },
                 },
             },
@@ -85,34 +106,7 @@ const theme = createTheme({
         MuiPaper: {
             styleOverrides: {
                 root: {
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                    '&.MuiPaper-elevation1': {
-                        boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
-                    },
-                },
-            },
-        },
-        MuiAppBar: {
-            styleOverrides: {
-                root: {
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                },
-            },
-        },
-        MuiTableRow: {
-            styleOverrides: {
-                root: {
-                    '&:hover': {
-                        backgroundColor: 'rgba(102, 126, 234, 0.04)',
-                    },
-                },
-            },
-        },
-        MuiLinearProgress: {
-            styleOverrides: {
-                root: {
-                    borderRadius: 4,
-                    height: 8,
+                    borderRadius: 12,
                 },
             },
         },
@@ -124,11 +118,18 @@ function App() {
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Router>
-                <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+                <Box sx={{
+                    display: 'flex',
+                    minHeight: '100vh',
+                    bgcolor: 'background.default'
+                }}>
                     <Routes>
                         <Route path="/" element={<Layout />}>
                             <Route index element={<Dashboard />} />
                             <Route path="admin" element={<Dashboard />} />
+
+                            {/* Admin Panel Routes */}
+                            <Route path="admin/music" element={<AddMusic />} />
                             <Route path="admin/playlists" element={<Playlists />} />
                             <Route path="admin/samples" element={<SampleBank />} />
                             <Route path="admin/store" element={<StoreManagement />} />
@@ -137,7 +138,7 @@ function App() {
                             <Route path="admin/analytics" element={<div>Analytics sayfası yakında...</div>} />
                             <Route path="admin/settings" element={<div>Settings sayfası yakında...</div>} />
 
-                            {/* Legacy routes (eski routelar) */}
+                            {/* Legacy routes (eski routelar) - backward compatibility için */}
                             <Route path="add-music" element={<AddMusic />} />
                             <Route path="samples" element={<Samples />} />
                             <Route path="upload" element={<UploadSample />} />
