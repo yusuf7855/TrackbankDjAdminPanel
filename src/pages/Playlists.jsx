@@ -1,5 +1,5 @@
-// Playlists.jsx - Platform Links System with Cover Image (Clean Code)
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// Playlists.jsx - INPUT FOCUS SORUNU DÜZELTİLMİŞ
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
     Box,
     Typography,
@@ -62,6 +62,13 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
+// TabPanel'i memo ile wrap et
+const TabPanel = memo(({ children, value, index }) => (
+    <div hidden={value !== index}>
+        {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+));
+
 export const Playlists = () => {
     const [playlists, setPlaylists] = useState([]);
     const [musics, setMusics] = useState([]);
@@ -88,7 +95,7 @@ export const Playlists = () => {
     const [coverImagePreview, setCoverImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState(null);
 
-    // Genre listesi
+    // Genre listesi - useMemo kullan
     const genres = useMemo(() => [
         { value: 'all', label: 'Tüm Türler', color: '#4caf50', icon: '🎵' },
         { value: 'afrohouse', label: 'Afro House', color: '#ff9800', icon: '🌍' },
@@ -98,11 +105,7 @@ export const Playlists = () => {
         { value: 'melodichouse', label: 'Melodic House', color: '#9c27b0', icon: '🎹' }
     ], []);
 
-    useEffect(() => {
-        fetchPlaylists();
-        fetchMusics();
-    }, []);
-
+    // Fetch fonksiyonları
     const fetchPlaylists = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/playlists/admin`);
@@ -125,7 +128,13 @@ export const Playlists = () => {
         }
     }, []);
 
-    const filterMusics = useCallback(() => {
+    useEffect(() => {
+        fetchPlaylists();
+        fetchMusics();
+    }, [fetchPlaylists, fetchMusics]);
+
+    // Filter musics
+    useEffect(() => {
         let filtered = [...musics];
 
         if (selectedMusicCategory !== 'all') {
@@ -142,10 +151,7 @@ export const Playlists = () => {
         setFilteredMusics(filtered);
     }, [musics, selectedMusicCategory, musicSearchTerm]);
 
-    useEffect(() => {
-        filterMusics();
-    }, [filterMusics]);
-
+    // Handler fonksiyonları
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -159,7 +165,7 @@ export const Playlists = () => {
         }
     };
 
-    const validateForm = useCallback(() => {
+    const validateForm = () => {
         if (!playlistName?.trim()) {
             setError('Playlist adı gereklidir');
             return false;
@@ -168,7 +174,6 @@ export const Playlists = () => {
             setError('Alt kategori kodu gereklidir (örn: AH1, MH1)');
             return false;
         }
-        // SubCategory format validation
         if (!/^[A-Z]{2}\d+$/.test(playlistSubCategory.trim())) {
             setError('Alt kategori formatı geçersiz (Örn: AH1, MH1, ID1)');
             return false;
@@ -182,9 +187,9 @@ export const Playlists = () => {
             return false;
         }
         return true;
-    }, [playlistName, playlistSubCategory, selectedMusics.length]);
+    };
 
-    const handleSubmit = useCallback(async () => {
+    const handleSubmit = async () => {
         if (!validateForm()) return;
 
         setSubmitLoading(true);
@@ -220,9 +225,9 @@ export const Playlists = () => {
         } finally {
             setSubmitLoading(false);
         }
-    }, [validateForm, playlistName, playlistDescription, playlistGenre, playlistSubCategory, selectedMusics, coverImage, editingPlaylist, fetchPlaylists]);
+    };
 
-    const handleEdit = useCallback((playlist) => {
+    const handleEdit = (playlist) => {
         setEditingPlaylist(playlist);
         setPlaylistName(playlist.name || '');
         setPlaylistDescription(playlist.description || '');
@@ -232,9 +237,9 @@ export const Playlists = () => {
         setCoverImagePreview(playlist.coverImage || null);
         setSelectedMusics(playlist.musics?.map(m => m._id) || []);
         setOpenDialog(true);
-    }, []);
+    };
 
-    const handleDelete = useCallback(async (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Bu admin playlist\'i silmek istediğinizden emin misiniz?')) {
             try {
                 await axios.delete(`${API_BASE_URL}/playlists/admin/${id}`);
@@ -245,9 +250,9 @@ export const Playlists = () => {
                 setError('Admin playlist silinirken hata oluştu');
             }
         }
-    }, [fetchPlaylists]);
+    };
 
-    const handleMusicToggle = useCallback((musicId) => {
+    const handleMusicToggle = (musicId) => {
         setSelectedMusics(prev => {
             const newSelection = prev.includes(musicId)
                 ? prev.filter(id => id !== musicId)
@@ -261,9 +266,9 @@ export const Playlists = () => {
             setError(null);
             return newSelection;
         });
-    }, []);
+    };
 
-    const resetForm = useCallback(() => {
+    const resetForm = () => {
         setPlaylistName('');
         setPlaylistDescription('');
         setPlaylistGenre('afrohouse');
@@ -277,16 +282,17 @@ export const Playlists = () => {
         setError(null);
         setTabValue(0);
         setSubmitLoading(false);
-    }, []);
+    };
 
-    const getGenreData = useCallback((genreValue) => {
+    const getGenreData = (genreValue) => {
         return genres.find(g => g.value === genreValue) || {
             label: genreValue,
             color: '#757575',
             icon: '🎵'
         };
-    }, [genres]);
+    };
 
+    // Filtered playlists
     const filteredPlaylists = useMemo(() => {
         return playlists.filter(playlist => {
             const matchesCategory = filterCategory === 'all' || playlist.genre === filterCategory;
@@ -295,12 +301,6 @@ export const Playlists = () => {
             return matchesCategory && matchesSearch;
         });
     }, [playlists, filterCategory, searchTerm]);
-
-    const TabPanel = ({ children, value, index }) => (
-        <div hidden={value !== index}>
-            {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
-        </div>
-    );
 
     if (loading) {
         return (
@@ -652,6 +652,7 @@ export const Playlists = () => {
                                     onChange={(e) => setPlaylistName(e.target.value)}
                                     required
                                     placeholder="Örn: Afro House Essentials"
+                                    autoComplete="off"
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -663,6 +664,7 @@ export const Playlists = () => {
                                     placeholder="AH1, MH1..."
                                     required
                                     helperText="Format: İki harf + sayı"
+                                    autoComplete="off"
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -703,6 +705,7 @@ export const Playlists = () => {
                                     multiline
                                     rows={3}
                                     placeholder="Bu playlist hakkında kısa bir açıklama..."
+                                    autoComplete="off"
                                 />
                             </Grid>
                         </Grid>
@@ -780,6 +783,7 @@ export const Playlists = () => {
                                 }}
                                 placeholder="https://example.com/cover.jpg"
                                 helperText="Harici bir cover image linki girebilirsiniz"
+                                autoComplete="off"
                             />
                         </Stack>
                     </TabPanel>
@@ -797,6 +801,7 @@ export const Playlists = () => {
                                     InputProps={{
                                         startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                                     }}
+                                    autoComplete="off"
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -867,7 +872,6 @@ export const Playlists = () => {
                                             </Stack>
                                         }
                                     />
-                                    {/* Platform Icons */}
                                     <Stack direction="row" spacing={0.5}>
                                         {music.platformLinks?.appleMusic && (
                                             <Tooltip title="Apple Music">
