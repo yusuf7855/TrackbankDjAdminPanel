@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Drawer,
     List,
@@ -10,7 +10,10 @@ import {
     Box,
     Divider,
     Avatar,
-    Chip
+    Chip,
+    IconButton,
+    Collapse,
+    Badge
 } from '@mui/material';
 import {
     Dashboard as DashboardIcon,
@@ -22,318 +25,543 @@ import {
     Settings as SettingsIcon,
     People as UsersIcon,
     Analytics as AnalyticsIcon,
-    AdminPanelSettings as AdminIcon
+    AdminPanelSettings as AdminIcon,
+    Circle as CircleIcon,
+    ExpandLess,
+    ExpandMore,
+    Logout as LogoutIcon,
+    Menu as MenuIcon,
+    Close as CloseIcon,
+    TrendingUp,
+    MusicNote,
+    Group,
+    PlayCircle
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
 
+// Menu items configuration
 const menuItems = [
     {
+        id: 'dashboard',
         title: 'Dashboard',
         icon: <DashboardIcon />,
         path: '/admin',
-        description: 'Genel Bakış',
-        color: '#667eea'
+        description: 'Genel Bakış'
     },
     {
-        title: 'Müzik Ekleme',
+        id: 'music',
+        title: 'Müzik Yönetimi',
         icon: <MusicAddIcon />,
         path: '/admin/music',
-        description: 'Spotify Müzik Ekleme',
-        color: '#1db954', // Spotify yeşili
-        isNew: false
+        description: 'Müzik Ekleme ve Düzenleme'
     },
     {
+        id: 'playlists',
         title: 'Playlist Yönetimi',
         icon: <PlaylistIcon />,
         path: '/admin/playlists',
-        description: 'Admin Playlist\'leri',
-        color: '#764ba2'
+        description: 'Admin Playlist\'leri'
     },
     {
+        id: 'samples',
         title: 'Sample Bank',
         icon: <SampleIcon />,
         path: '/admin/samples',
-        description: 'Sample Yönetimi',
-        color: '#f093fb'
+        description: 'Sample Yönetimi'
     },
     {
-        title: 'Mağaza Yönetimi',
+        id: 'store',
+        title: 'Mağaza',
         icon: <StoreIcon />,
         path: '/admin/store',
         description: 'İlan ve Hak Yönetimi',
-        color: '#48c78e',
-        isNew: true // Yeni özellik badge'i için
+        badge: 'NEW'
     },
     {
+        id: 'notifications',
         title: 'Bildirimler',
         icon: <NotificationIcon />,
         path: '/admin/notifications',
         description: 'Push Bildirimleri',
-        color: '#ffdd57'
+        badgeCount: 5
     },
     {
+        id: 'users',
         title: 'Kullanıcılar',
         icon: <UsersIcon />,
         path: '/admin/users',
         description: 'Kullanıcı Yönetimi',
-        color: '#ff7675'
+        badge: 'NEW'
     },
     {
+        id: 'analytics',
         title: 'Analytics',
         icon: <AnalyticsIcon />,
         path: '/admin/analytics',
-        description: 'İstatistikler',
-        color: '#00b894'
+        description: 'İstatistikler'
     },
     {
+        id: 'settings',
         title: 'Ayarlar',
         icon: <SettingsIcon />,
         path: '/admin/settings',
-        description: 'Sistem Ayarları',
-        color: '#636e72'
+        description: 'Sistem Ayarları'
     }
 ];
 
+// Quick stats configuration
+const quickStats = [
+    { icon: <MusicNote />, label: 'Müzik', value: '1,247', trend: '+12%', color: '#4caf50' },
+    { icon: <PlaylistIcon />, label: 'Playlist', value: '45', trend: '+5%', color: '#4caf50' },
+    { icon: <Group />, label: 'Kullanıcı', value: '2.1K', trend: '+18%', color: '#4caf50' },
+    { icon: <PlayCircle />, label: 'Dinlenme', value: '15.2K', trend: '+25%', color: '#4caf50' }
+];
+
 export default function AdminSidebar({ currentPath, onNavigate }) {
-    return (
-        <Drawer
-            variant="permanent"
-            sx={{
-                width: drawerWidth,
-                flexShrink: 0,
-                '& .MuiDrawer-paper': {
-                    width: drawerWidth,
-                    boxSizing: 'border-box',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    borderRight: 'none',
-                    boxShadow: '4px 0 20px rgba(0,0,0,0.1)'
-                },
-            }}
-        >
-            {/* Logo/Header */}
-            <Box sx={{
-                p: 3,
-                textAlign: 'center',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.05)'
-            }}>
-                <Avatar
-                    sx={{
-                        width: 60,
-                        height: 60,
-                        mx: 'auto',
-                        mb: 2,
-                        background: 'rgba(255,255,255,0.2)',
-                        fontSize: '2rem'
-                    }}
-                >
-                    🎵
-                </Avatar>
-                <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
-                    DJ Mobile Admin
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: '0.85rem' }}>
-                    Yönetim Paneli v1.0
-                </Typography>
-                <Chip
-                    label="Admin"
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [statsCollapsed, setStatsCollapsed] = useState(false);
+
+    const handleDrawerToggle = () => {
+        setMobileOpen(!mobileOpen);
+    };
+
+    const handleLogout = () => {
+        // Logout işlemi
+        console.log('Logout');
+        if (onNavigate) {
+            onNavigate('/login');
+        }
+    };
+
+    // Drawer içeriğini oluştur - PART 1
+    const drawerHeader = (
+        <Box sx={{
+            p: 2.5,
+            borderBottom: '1px solid #e5e5e5',
+            background: '#fff'
+        }}>
+            {/* Logo ve Başlık */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar
+                        sx={{
+                            width: 40,
+                            height: 40,
+                            backgroundColor: '#000',
+                            mr: 1.5
+                        }}
+                    >
+                        <AdminIcon sx={{ fontSize: 20, color: '#fff' }} />
+                    </Avatar>
+                    <Box>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                fontSize: '1rem',
+                                fontWeight: 800,
+                                color: '#000',
+                                letterSpacing: '-0.3px',
+                                lineHeight: 1
+                            }}
+                        >
+                            TrackBang
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                color: '#666',
+                                fontSize: '0.7rem',
+                                fontWeight: 500,
+                                letterSpacing: '0.5px',
+                                textTransform: 'uppercase'
+                            }}
+                        >
+                            Admin Panel
+                        </Typography>
+                    </Box>
+                </Box>
+
+                {/* Mobile Close Button */}
+                <IconButton
                     size="small"
-                    icon={<AdminIcon sx={{ fontSize: '0.8rem !important' }} />}
+                    sx={{ display: { md: 'none' } }}
+                    onClick={handleDrawerToggle}
+                >
+                    <CloseIcon fontSize="small" />
+                </IconButton>
+            </Box>
+
+            {/* Status Bar */}
+            <Box sx={{
+                mt: 2,
+                p: 1,
+                backgroundColor: '#f8f8f8',
+                borderRadius: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+            }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircleIcon sx={{ fontSize: 8, color: '#4caf50' }} />
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            color: '#333'
+                        }}
+                    >
+                        Sistem Aktif
+                    </Typography>
+                </Box>
+                <Chip
+                    label="v1.0.0"
+                    size="small"
                     sx={{
-                        mt: 1,
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white',
-                        fontSize: '0.75rem'
+                        height: 18,
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        backgroundColor: '#000',
+                        color: '#fff',
+                        '& .MuiChip-label': {
+                            px: 1
+                        }
                     }}
                 />
             </Box>
+        </Box>
+    );
+    // Part 1'den devam...
 
-            {/* Navigation Menu */}
-            <List sx={{ flex: 1, p: 2 }}>
-                {menuItems.map((item) => (
-                    <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
-                        <ListItemButton
-                            onClick={() => onNavigate(item.path)}
-                            selected={currentPath === item.path}
-                            sx={{
-                                borderRadius: 2,
-                                py: 1.5,
-                                px: 2,
-                                position: 'relative',
-                                overflow: 'hidden',
-                                transition: 'all 0.3s ease',
-                                '&.Mui-selected': {
-                                    background: `linear-gradient(135deg, ${item.color}40 0%, ${item.color}20 100%)`,
-                                    backdropFilter: 'blur(10px)',
-                                    border: `1px solid ${item.color}60`,
-                                    transform: 'translateX(8px)',
-                                    '&::before': {
-                                        content: '""',
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        width: 4,
-                                        background: item.color,
-                                        borderRadius: '0 2px 2px 0'
-                                    }
-                                },
-                                '&:hover:not(.Mui-selected)': {
-                                    background: 'rgba(255,255,255,0.1)',
-                                    backdropFilter: 'blur(5px)',
-                                    transform: 'translateX(4px)'
+    // Navigation Menu
+    const navigationMenu = (
+        <List sx={{
+            flex: 1,
+            py: 1,
+            px: 2,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            '&::-webkit-scrollbar': {
+                width: '4px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+                background: '#ddd',
+                borderRadius: '2px',
+            }
+        }}>
+            {menuItems.map((item) => (
+                <ListItem key={item.id} disablePadding sx={{ mb: 0.3 }}>
+                    <ListItemButton
+                        onClick={() => onNavigate(item.path)}
+                        selected={currentPath === item.path}
+                        sx={{
+                            borderRadius: 1.5,
+                            py: 1.3,
+                            px: 1.5,
+                            minHeight: 46,
+                            transition: 'all 0.2s ease',
+                            position: 'relative',
+                            '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                left: 0,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: 3,
+                                height: currentPath === item.path ? '60%' : 0,
+                                backgroundColor: '#000',
+                                borderRadius: '0 2px 2px 0',
+                                transition: 'height 0.2s ease'
+                            },
+                            '&.Mui-selected': {
+                                backgroundColor: '#f5f5f5',
+                                '&:hover': {
+                                    backgroundColor: '#efefef'
                                 }
+                            },
+                            '&:hover:not(.Mui-selected)': {
+                                backgroundColor: '#fafafa'
+                            }
+                        }}
+                    >
+                        <ListItemIcon sx={{
+                            color: currentPath === item.path ? '#000' : '#666',
+                            minWidth: 36
+                        }}>
+                            <Badge
+                                badgeContent={item.badgeCount}
+                                color="error"
+                                sx={{
+                                    '& .MuiBadge-badge': {
+                                        fontSize: '0.6rem',
+                                        height: 14,
+                                        minWidth: 14,
+                                        backgroundColor: '#ff4444'
+                                    }
+                                }}
+                            >
+                                {item.icon}
+                            </Badge>
+                        </ListItemIcon>
+                        <ListItemText
+                            primary={
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            fontWeight: currentPath === item.path ? 700 : 500,
+                                            fontSize: '0.85rem',
+                                            color: currentPath === item.path ? '#000' : '#333',
+                                            letterSpacing: '0.01em'
+                                        }}
+                                    >
+                                        {item.title}
+                                    </Typography>
+                                    {item.badge && (
+                                        <Chip
+                                            label={item.badge}
+                                            size="small"
+                                            sx={{
+                                                height: 16,
+                                                fontSize: '0.6rem',
+                                                fontWeight: 700,
+                                                backgroundColor: '#000',
+                                                color: '#fff',
+                                                '& .MuiChip-label': {
+                                                    px: 0.7
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                </Box>
+                            }
+                        />
+                    </ListItemButton>
+                </ListItem>
+            ))}
+        </List>
+    );
+
+    // Stats Section
+    const statsSection = (
+        <Box>
+            <ListItemButton
+                onClick={() => setStatsCollapsed(!statsCollapsed)}
+                sx={{
+                    px: 2.5,
+                    py: 1.2,
+                    borderTop: '1px solid #e5e5e5',
+                    '&:hover': { backgroundColor: '#fafafa' }
+                }}
+            >
+                <ListItemText
+                    primary={
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontWeight: 700,
+                                fontSize: '0.7rem',
+                                color: '#666',
+                                letterSpacing: '0.1em',
+                                textTransform: 'uppercase'
                             }}
                         >
-                            <ListItemIcon sx={{
-                                color: 'inherit',
-                                minWidth: 40,
-                                '& svg': {
-                                    fontSize: '1.3rem',
-                                    filter: currentPath === item.path ? `drop-shadow(0 0 8px ${item.color})` : 'none'
-                                }
-                            }}>
-                                {item.icon}
-                            </ListItemIcon>
-                            <ListItemText
-                                primary={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Typography variant="body2" fontWeight={currentPath === item.path ? 600 : 500}>
-                                            {item.title}
-                                        </Typography>
-                                        {item.isNew && (
-                                            <Chip
-                                                label="NEW"
-                                                size="small"
-                                                sx={{
-                                                    height: 16,
-                                                    fontSize: '0.65rem',
-                                                    bgcolor: '#ff4757',
-                                                    color: 'white',
-                                                    fontWeight: 'bold'
-                                                }}
-                                            />
-                                        )}
-                                    </Box>
-                                }
-                                secondary={
-                                    <Typography variant="caption" sx={{
-                                        opacity: 0.7,
-                                        fontSize: '0.7rem',
-                                        display: currentPath === item.path ? 'block' : 'none'
+                            İstatistikler
+                        </Typography>
+                    }
+                />
+                {statsCollapsed ? <ExpandMore sx={{ fontSize: 18 }} /> : <ExpandLess sx={{ fontSize: 18 }} />}
+            </ListItemButton>
+
+            <Collapse in={!statsCollapsed} timeout="auto" unmountOnExit>
+                <Box sx={{ px: 2, pb: 2 }}>
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 1
+                    }}>
+                        {quickStats.map((stat, index) => (
+                            <Box
+                                key={index}
+                                sx={{
+                                    p: 1.2,
+                                    backgroundColor: '#fafafa',
+                                    borderRadius: 1,
+                                    border: '1px solid #e5e5e5'
+                                }}
+                            >
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    mb: 0.5
+                                }}>
+                                    <Box sx={{
+                                        color: '#999',
+                                        '& svg': { fontSize: 14 }
                                     }}>
-                                        {item.description}
+                                        {stat.icon}
+                                    </Box>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            ml: 0.5,
+                                            fontSize: '0.65rem',
+                                            color: '#999',
+                                            fontWeight: 500
+                                        }}
+                                    >
+                                        {stat.label}
                                     </Typography>
-                                }
-                            />
-                        </ListItemButton>
-                    </ListItem>
-                ))}
-            </List>
-
-            {/* Stats Section */}
-            <Box sx={{
-                mx: 2,
-                mb: 2,
-                p: 2,
-                bgcolor: 'rgba(0,0,0,0.2)',
-                borderRadius: 2,
-                backdropFilter: 'blur(10px)'
-            }}>
-                <Typography variant="h6" sx={{ mb: 2, fontSize: '0.9rem', fontWeight: 600 }}>
-                    Hızlı İstatistikler
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
-                            Toplam Müzik
-                        </Typography>
-                        <Chip
-                            label="1,247"
-                            size="small"
-                            sx={{
-                                bgcolor: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                height: 20
-                            }}
-                        />
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
-                            Aktif Playlist
-                        </Typography>
-                        <Chip
-                            label="45"
-                            size="small"
-                            sx={{
-                                bgcolor: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                height: 20
-                            }}
-                        />
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
-                            Aktif Kullanıcı
-                        </Typography>
-                        <Chip
-                            label="142"
-                            size="small"
-                            sx={{
-                                bgcolor: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                height: 20
-                            }}
-                        />
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem', opacity: 0.8 }}>
-                            Günlük İndirme
-                        </Typography>
-                        <Chip
-                            label="89"
-                            size="small"
-                            sx={{
-                                bgcolor: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                fontSize: '0.7rem',
-                                height: 20
-                            }}
-                        />
+                                </Box>
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        fontSize: '0.95rem',
+                                        fontWeight: 800,
+                                        color: '#000',
+                                        lineHeight: 1
+                                    }}
+                                >
+                                    {stat.value}
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        fontSize: '0.6rem',
+                                        color: stat.color,
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    {stat.trend}
+                                </Typography>
+                            </Box>
+                        ))}
                     </Box>
                 </Box>
-            </Box>
+            </Collapse>
+        </Box>
+    );
 
-            {/* Footer */}
+    // Footer Section
+    const footerSection = (
+        <Box>
+            {/* Logout Button */}
             <Box sx={{
                 p: 2,
-                borderTop: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(0,0,0,0.1)'
+                borderTop: '1px solid #e5e5e5'
             }}>
-                <Typography variant="body2" sx={{ opacity: 0.6, textAlign: 'center', fontSize: '0.75rem' }}>
-                    DJ Mobile App v1.0
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.6, textAlign: 'center', fontSize: '0.65rem' }}>
-                    © 2024 Admin Panel
-                </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-                    <Chip
-                        label="🟢 Online"
-                        size="small"
-                        sx={{
-                            bgcolor: 'rgba(72, 199, 142, 0.2)',
-                            color: '#48c78e',
-                            fontSize: '0.65rem',
-                            height: 18
-                        }}
+                <ListItemButton
+                    onClick={handleLogout}
+                    sx={{
+                        borderRadius: 1.5,
+                        py: 1.2,
+                        px: 2,
+                        backgroundColor: '#f5f5f5',
+                        '&:hover': {
+                            backgroundColor: '#efefef'
+                        }
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: 36, color: '#666' }}>
+                        <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                        primary={
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    color: '#333'
+                                }}
+                            >
+                                Çıkış Yap
+                            </Typography>
+                        }
                     />
-                </Box>
+                </ListItemButton>
             </Box>
-        </Drawer>
+
+            {/* Copyright */}
+            <Box sx={{
+                p: 2,
+                backgroundColor: '#fafafa',
+                borderTop: '1px solid #e5e5e5',
+                textAlign: 'center'
+            }}>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        fontSize: '0.65rem',
+                        color: '#999',
+                        display: 'block'
+                    }}
+                >
+                    © 2024 TrackBang
+                </Typography>
+            </Box>
+        </Box>
+    );
+
+    // Complete drawer content
+    const drawerContent = (
+        <Box sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#ffffff'
+        }}>
+            {drawerHeader}
+            {navigationMenu}
+            {statsSection}
+            {footerSection}
+        </Box>
+    );
+
+    // Main return
+    return (
+        <>
+            {/* Desktop Drawer */}
+            <Drawer
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', md: 'block' },
+                    width: drawerWidth,
+                    flexShrink: 0,
+                    '& .MuiDrawer-paper': {
+                        width: drawerWidth,
+                        boxSizing: 'border-box',
+                        borderRight: '1px solid #e5e5e5',
+                        boxShadow: 'none'
+                    },
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+
+            {/* Mobile Drawer */}
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{
+                    keepMounted: true
+                }}
+                sx={{
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': {
+                        width: drawerWidth,
+                        boxSizing: 'border-box'
+                    },
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+        </>
     );
 }

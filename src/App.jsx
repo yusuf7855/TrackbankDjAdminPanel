@@ -11,6 +11,7 @@ import { Playlists } from "./pages/Playlists.jsx";
 import SampleBank from "./pages/SampleBank.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import StoreManagement from "./pages/StoreManagement.jsx";
+import UserManagement from "./pages/UserManagement.jsx"; // YENİ EKLENEN
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -110,6 +111,24 @@ const theme = createTheme({
                 },
             },
         },
+        MuiChip: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 6,
+                },
+            },
+        },
+        MuiTableCell: {
+            styleOverrides: {
+                root: {
+                    borderBottom: '1px solid #e0e0e0',
+                },
+                head: {
+                    fontWeight: 600,
+                    backgroundColor: '#fafafa',
+                },
+            },
+        },
     },
 });
 
@@ -134,9 +153,15 @@ function App() {
                             <Route path="admin/samples" element={<SampleBank />} />
                             <Route path="admin/store" element={<StoreManagement />} />
                             <Route path="admin/notifications" element={<Notifications />} />
-                            <Route path="admin/users" element={<div>Kullanıcılar sayfası yakında...</div>} />
-                            <Route path="admin/analytics" element={<div>Analytics sayfası yakında...</div>} />
-                            <Route path="admin/settings" element={<div>Settings sayfası yakında...</div>} />
+                            <Route path="admin/users" element={<UserManagement />} /> {/* GÜNCELLENDİ */}
+                            <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
+                                <h2>Analytics</h2>
+                                <p>Analytics sayfası yakında...</p>
+                            </div>} />
+                            <Route path="admin/settings" element={<div style={{ padding: '24px' }}>
+                                <h2>Ayarlar</h2>
+                                <p>Ayarlar sayfası yakında...</p>
+                            </div>} />
 
                             {/* Legacy routes (eski routelar) - backward compatibility için */}
                             <Route path="add-music" element={<AddMusic />} />
@@ -146,7 +171,11 @@ function App() {
                             <Route path="notifications" element={<Notifications />} />
                             <Route path="playlists" element={<Playlists />} />
                             <Route path="store" element={<StoreManagement />} />
-                            <Route path="settings" element={<div>Settings sayfası yakında...</div>} />
+                            <Route path="users" element={<UserManagement />} /> {/* YENİ EKLENEN */}
+                            <Route path="settings" element={<div style={{ padding: '24px' }}>
+                                <h2>Ayarlar</h2>
+                                <p>Ayarlar sayfası yakında...</p>
+                            </div>} />
                         </Route>
                     </Routes>
                 </Box>

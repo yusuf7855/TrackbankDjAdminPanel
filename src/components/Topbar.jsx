@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     AppBar,
     Toolbar,
@@ -8,96 +8,413 @@ import {
     Avatar,
     Menu,
     MenuItem,
-    Box
+    Box,
+    Divider,
+    ListItemIcon,
+    ListItemText,
+    Tooltip,
+    Chip
 } from '@mui/material';
 import {
     Menu as MenuIcon,
     Notifications as NotificationsIcon,
-    Mail as MailIcon
+    Mail as MailIcon,
+    Person as PersonIcon,
+    Settings as SettingsIcon,
+    Logout as LogoutIcon,
+    Search as SearchIcon,
+    DarkMode as DarkModeIcon,
+    LightMode as LightModeIcon,
+    AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
+import { useLocation } from 'react-router-dom';
 
-const Topbar = () => {
-    const [anchorEl, setAnchorEl] = React.useState(null);
+const Topbar = ({ onMenuClick }) => {
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [notificationAnchor, setNotificationAnchor] = useState(null);
+    const location = useLocation();
 
     const handleMenu = (event) => {
         setAnchorEl(event.currentTarget);
     };
 
+    const handleNotificationMenu = (event) => {
+        setNotificationAnchor(event.currentTarget);
+    };
+
     const handleClose = () => {
         setAnchorEl(null);
+        setNotificationAnchor(null);
     };
+
+    // Sayfa başlığını al
+    const getPageTitle = () => {
+        const path = location.pathname;
+        const titles = {
+            '/admin': 'Dashboard',
+            '/admin/music': 'Müzik Yönetimi',
+            '/admin/playlists': 'Playlist Yönetimi',
+            '/admin/samples': 'Sample Bank',
+            '/admin/store': 'Mağaza Yönetimi',
+            '/admin/notifications': 'Bildirimler',
+            '/admin/users': 'Kullanıcı Yönetimi',
+            '/admin/analytics': 'Analytics',
+            '/admin/settings': 'Ayarlar'
+        };
+        return titles[path] || 'Admin Panel';
+    };
+
+    // Mock notifications
+    const notifications = [
+        { id: 1, title: 'Yeni müzik eklendi', time: '2 dakika önce', read: false },
+        { id: 2, title: 'Sistem güncellendi', time: '1 saat önce', read: false },
+        { id: 3, title: 'Yeni kullanıcı kaydı', time: '3 saat önce', read: true },
+        { id: 4, title: 'Playlist onaylandı', time: '5 saat önce', read: true }
+    ];
+
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
         <AppBar
             position="fixed"
+            elevation={0}
             sx={{
-                width: `calc(100% - 240px)`,
-                ml: '240px',
-                bgcolor: 'background.paper',
-                color: 'text.primary',
-                boxShadow: 'none',
-                borderBottom: '1px solid',
-                borderColor: 'divider'
+                width: { xs: '100%', md: 'calc(100% - 280px)' },
+                ml: { xs: 0, md: '280px' },
+                backgroundColor: '#ffffff',
+                borderBottom: '1px solid #e5e5e5',
+                color: '#000'
             }}
         >
-            <Toolbar>
+            <Toolbar sx={{ px: { xs: 2, sm: 3 } }}>
+                {/* Mobile Menu Button */}
                 <IconButton
                     color="inherit"
                     aria-label="open drawer"
                     edge="start"
-                    sx={{ mr: 2, display: { sm: 'none' } }}
+                    onClick={onMenuClick}
+                    sx={{
+                        mr: 2,
+                        display: { md: 'none' },
+                        color: '#333'
+                    }}
                 >
                     <MenuIcon />
                 </IconButton>
-                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                    Dashboard
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <IconButton size="large" color="inherit">
-                        <Badge badgeContent={4} color="error">
-                            <MailIcon />
-                        </Badge>
-                    </IconButton>
-                    <IconButton size="large" color="inherit">
-                        <Badge badgeContent={7} color="error">
-                            <NotificationsIcon />
-                        </Badge>
-                    </IconButton>
-                    <IconButton
-                        size="large"
-                        edge="end"
-                        aria-label="account of current user"
-                        aria-controls="menu-appbar"
-                        aria-haspopup="true"
-                        onClick={handleMenu}
-                        color="inherit"
-                    >
-                        <Avatar
-                            sx={{ width: 32, height: 32 }}
-                            alt="User Avatar"
-                            src="/static/images/avatar/1.jpg"
-                        />
-                    </IconButton>
-                    <Menu
-                        id="menu-appbar"
-                        anchorEl={anchorEl}
-                        anchorOrigin={{
-                            vertical: 'top',
-                            horizontal: 'right',
+
+                {/* Page Title */}
+                <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                        variant="h6"
+                        noWrap
+                        component="div"
+                        sx={{
+                            fontWeight: 700,
+                            fontSize: '1.1rem',
+                            color: '#000',
+                            letterSpacing: '-0.3px'
                         }}
-                        keepMounted
-                        transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'right',
-                        }}
-                        open={Boolean(anchorEl)}
-                        onClose={handleClose}
                     >
-                        <MenuItem onClick={handleClose}>Profile</MenuItem>
-                        <MenuItem onClick={handleClose}>Settings</MenuItem>
-                        <MenuItem onClick={handleClose}>Logout</MenuItem>
-                    </Menu>
+                        {getPageTitle()}
+                    </Typography>
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            color: '#666',
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            letterSpacing: '0.5px'
+                        }}
+                    >
+                        TrackBang Admin Panel
+                    </Typography>
                 </Box>
+
+                {/* Action Buttons */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {/* Search Button */}
+                    <Tooltip title="Ara">
+                        <IconButton
+                            size="large"
+                            sx={{
+                                color: '#666',
+                                '&:hover': {
+                                    backgroundColor: '#f5f5f5'
+                                }
+                            }}
+                        >
+                            <SearchIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    {/* Notifications */}
+                    <Tooltip title="Bildirimler">
+                        <IconButton
+                            size="large"
+                            onClick={handleNotificationMenu}
+                            sx={{
+                                color: '#666',
+                                '&:hover': {
+                                    backgroundColor: '#f5f5f5'
+                                }
+                            }}
+                        >
+                            <Badge
+                                badgeContent={unreadCount}
+                                sx={{
+                                    '& .MuiBadge-badge': {
+                                        backgroundColor: '#000',
+                                        color: '#fff',
+                                        fontSize: '0.65rem',
+                                        height: 18,
+                                        minWidth: 18
+                                    }
+                                }}
+                            >
+                                <NotificationsIcon />
+                            </Badge>
+                        </IconButton>
+                    </Tooltip>
+
+                    <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: '#e5e5e5' }} />
+
+                    {/* User Menu */}
+                    <Box
+                        onClick={handleMenu}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            cursor: 'pointer',
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 2,
+                            transition: 'background-color 0.2s',
+                            '&:hover': {
+                                backgroundColor: '#f5f5f5'
+                            }
+                        }}
+                    >
+                        <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    color: '#000'
+                                }}
+                            >
+                                Admin User
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: '#666',
+                                    fontSize: '0.7rem'
+                                }}
+                            >
+                                Super Admin
+                            </Typography>
+                        </Box>
+                        <Avatar
+                            sx={{
+                                width: 36,
+                                height: 36,
+                                backgroundColor: '#000',
+                                fontSize: '0.85rem',
+                                fontWeight: 600
+                            }}
+                        >
+                            A
+                        </Avatar>
+                    </Box>
+                </Box>
+
+                {/* Notifications Menu */}
+                <Menu
+                    anchorEl={notificationAnchor}
+                    open={Boolean(notificationAnchor)}
+                    onClose={handleClose}
+                    PaperProps={{
+                        sx: {
+                            mt: 1.5,
+                            minWidth: 320,
+                            maxHeight: 400,
+                            border: '1px solid #e5e5e5',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                        }
+                    }}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                >
+                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #e5e5e5' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                            Bildirimler
+                        </Typography>
+                        {unreadCount > 0 && (
+                            <Chip
+                                label={`${unreadCount} yeni`}
+                                size="small"
+                                sx={{
+                                    mt: 0.5,
+                                    height: 20,
+                                    fontSize: '0.65rem',
+                                    backgroundColor: '#000',
+                                    color: '#fff'
+                                }}
+                            />
+                        )}
+                    </Box>
+                    {notifications.map((notification, index) => (
+                        <MenuItem
+                            key={notification.id}
+                            onClick={handleClose}
+                            sx={{
+                                py: 1.5,
+                                px: 2,
+                                backgroundColor: !notification.read ? '#fafafa' : 'transparent',
+                                borderBottom: index < notifications.length - 1 ? '1px solid #f0f0f0' : 'none',
+                                '&:hover': {
+                                    backgroundColor: '#f5f5f5'
+                                }
+                            }}
+                        >
+                            <Box sx={{ width: '100%' }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        fontWeight: notification.read ? 400 : 600,
+                                        fontSize: '0.85rem',
+                                        color: '#000'
+                                    }}
+                                >
+                                    {notification.title}
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        color: '#666',
+                                        fontSize: '0.7rem'
+                                    }}
+                                >
+                                    {notification.time}
+                                </Typography>
+                            </Box>
+                        </MenuItem>
+                    ))}
+                    <Box sx={{ p: 1, borderTop: '1px solid #e5e5e5' }}>
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                display: 'block',
+                                textAlign: 'center',
+                                color: '#666',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    color: '#000'
+                                }
+                            }}
+                            onClick={() => {
+                                handleClose();
+                                // Navigate to notifications
+                            }}
+                        >
+                            Tüm bildirimleri gör
+                        </Typography>
+                    </Box>
+                </Menu>
+
+                {/* User Menu */}
+                <Menu
+                    id="menu-appbar"
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleClose}
+                    PaperProps={{
+                        sx: {
+                            mt: 1.5,
+                            minWidth: 200,
+                            border: '1px solid #e5e5e5',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                        }
+                    }}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                >
+                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #e5e5e5' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000' }}>
+                            Admin User
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#666' }}>
+                            admin@trackbang.com
+                        </Typography>
+                    </Box>
+
+                    <MenuItem
+                        onClick={handleClose}
+                        sx={{
+                            py: 1.2,
+                            '&:hover': {
+                                backgroundColor: '#f5f5f5'
+                            }
+                        }}
+                    >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                            <PersonIcon fontSize="small" sx={{ color: '#666' }} />
+                        </ListItemIcon>
+                        <ListItemText
+                            primary={
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                    Profil
+                                </Typography>
+                            }
+                        />
+                    </MenuItem>
+
+                    <MenuItem
+                        onClick={handleClose}
+                        sx={{
+                            py: 1.2,
+                            '&:hover': {
+                                backgroundColor: '#f5f5f5'
+                            }
+                        }}
+                    >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                            <SettingsIcon fontSize="small" sx={{ color: '#666' }} />
+                        </ListItemIcon>
+                        <ListItemText
+                            primary={
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                    Ayarlar
+                                </Typography>
+                            }
+                        />
+                    </MenuItem>
+
+                    <Divider sx={{ my: 0.5 }} />
+
+                    <MenuItem
+                        onClick={handleClose}
+                        sx={{
+                            py: 1.2,
+                            '&:hover': {
+                                backgroundColor: '#f5f5f5'
+                            }
+                        }}
+                    >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                            <LogoutIcon fontSize="small" sx={{ color: '#ff4444' }} />
+                        </ListItemIcon>
+                        <ListItemText
+                            primary={
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#ff4444' }}>
+                                    Çıkış Yap
+                                </Typography>
+                            }
+                        />
+                    </MenuItem>
+                </Menu>
             </Toolbar>
         </AppBar>
     );

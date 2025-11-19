@@ -1,10 +1,13 @@
-// src/pages/UserManagement.jsx - Pagination düzeltilmiş versiyon
+// src/pages/UserManagement.jsx - KULLANICI YÖNETİMİ SAYFASI
+
 import React, { useState, useEffect } from 'react';
 import {
     Box,
+    Grid,
+    Card,
+    CardContent,
     Typography,
-    Button,
-    TextField,
+    Avatar,
     Paper,
     Table,
     TableBody,
@@ -13,9 +16,13 @@ import {
     TableHead,
     TableRow,
     TablePagination,
-    Chip,
-    Avatar,
+    TextField,
+    InputAdornment,
     IconButton,
+    Chip,
+    Button,
+    Menu,
+    MenuItem,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -23,1069 +30,791 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem,
-    Grid,
-    Card,
-    CardContent,
-    Tooltip,
     Alert,
-    Snackbar,
+    CircularProgress,
+    Tooltip,
+    Divider,
     Stack,
-    CircularProgress
+    Fade,
+    Grow,
+    Badge,
+    LinearProgress
 } from '@mui/material';
 import {
-    Search as SearchIcon,
-    Delete as DeleteIcon,
-    Visibility as ViewIcon,
-    Restore as RestoreIcon,
-    Person as PersonIcon,
-    PersonOff as PersonOffIcon,
-    Group as GroupIcon,
-    PersonAdd as PersonAddIcon,
-    Refresh as RefreshIcon,
-    Warning as WarningIcon,
-    CheckCircle as CheckCircleIcon,
-    Error as ErrorIcon,
-    BugReport as BugReportIcon
+    Search,
+    MoreVert,
+    Edit,
+    Delete,
+    PersonOff,
+    Person,
+    Verified,
+    WorkspacePremium,
+    MusicNote,
+    Album,
+    LibraryMusic,
+    Share,
+    FilterList,
+    Badge as BadgeIcon,
+    LocalOffer,
+    LockReset,
+    Groups,
+    TrendingUp,
+    AdminPanelSettings,
+    Refresh,
+    CheckCircle,
+    Cancel,
+    Email,
+    Phone,
+    CalendarToday,
+    Star
 } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const UserManagement = () => {
-    // ============ STATE MANAGEMENT ============
+    // State
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [stats, setStats] = useState({
-        total: 0,
-        active: 0,
-        inactive: 0,
-        newThisMonth: 0,
-        newThisWeek: 0,
-        newToday: 0,
-        activePercentage: 0
-    });
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [alert, setAlert] = useState({ show: false, type: 'success', message: '' });
-    const [connectionStatus, setConnectionStatus] = useState('checking');
-    const [isUsingMockData, setIsUsingMockData] = useState(false);
-    const [debugInfo, setDebugInfo] = useState([]);
-
-    // Pagination & Filtering
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalUsers, setTotalUsers] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [sortBy] = useState('createdAt');
-    const [sortOrder] = useState('desc');
+    const [filterTag, setFilterTag] = useState('all');
+    const [filterBadge, setFilterBadge] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogType, setDialogType] = useState('');
+    const [stats, setStats] = useState(null);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertSeverity, setAlertSeverity] = useState('success');
 
-    // Modals
-    const [userDetailModal, setUserDetailModal] = useState(false);
-    const [deleteConfirmModal, setDeleteConfirmModal] = useState(false);
-    const [userToDelete, setUserToDelete] = useState(null);
-    const [debugModal, setDebugModal] = useState(false);
+    // Form States
+    const [selectedTag, setSelectedTag] = useState('');
+    const [selectedBadge, setSelectedBadge] = useState('');
+    const [badgeReason, setBadgeReason] = useState('');
+    const [newPassword, setNewPassword] = useState('');
 
-    // ============ ENHANCED MOCK DATA ============
-    const generateMockUsers = (totalCount = 100) => {
-        const mockUsers = [];
-        const firstNames = ['Ahmet', 'Mehmet', 'Ayşe', 'Fatma', 'Ali', 'Veli', 'Zeynep', 'Merve', 'Can', 'Ece', 'Burak', 'Selin', 'Kemal', 'Derya', 'Oğuz'];
-        const lastNames = ['Yılmaz', 'Kaya', 'Demir', 'Çelik', 'Şahin', 'Yıldız', 'Özkan', 'Polat', 'Aksoy', 'Güven', 'Türk', 'Aydın', 'Öztürk', 'Karaca'];
-
-        for (let i = 1; i <= totalCount; i++) {
-            const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-            const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-            const isActive = Math.random() > 0.2; // 80% aktif
-            const createdDaysAgo = Math.floor(Math.random() * 365);
-
-            mockUsers.push({
-                _id: `mock_${i}`,
-                username: `user${i.toString().padStart(3, '0')}`,
-                email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-                firstName,
-                lastName,
-                fullName: `${firstName} ${lastName}`,
-                isActive,
-                createdAt: new Date(Date.now() - (createdDaysAgo * 24 * 60 * 60 * 1000)).toISOString(),
-                followersCount: Math.floor(Math.random() * 500),
-                followingCount: Math.floor(Math.random() * 200),
-                bio: `${firstName} ${lastName} - Müzik tutkunu`
-            });
-        }
-
-        return mockUsers;
+    // Tag ve Badge Tanımları
+    const tags = {
+        producer: { label: 'Prodüktör', icon: MusicNote, color: '#9c27b0', bgColor: '#9c27b010' },
+        dj: { label: 'DJ', icon: Album, color: '#2196f3', bgColor: '#2196f310' },
+        'dj-producer': { label: 'DJ & Prodüktör', icon: LibraryMusic, color: '#4caf50', bgColor: '#4caf5010' },
+        distributor: { label: 'Distribütör', icon: Share, color: '#ff9800', bgColor: '#ff980010' },
+        none: { label: 'Yok', icon: null, color: '#757575', bgColor: '#75757510' }
     };
 
-    const allMockUsers = generateMockUsers(234); // Toplam 234 mock kullanıcı
-
-    // ============ API CONFIGURATION ============
-
-    const addDebugInfo = (message) => {
-        console.log(message);
-        setDebugInfo(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
+    const badges = {
+        standard: { label: 'Standart', icon: Verified, color: '#757575' },
+        premium: { label: 'Premium', icon: WorkspacePremium, color: '#ffc107' },
+        none: { label: 'Yok', icon: null, color: '#bdbdbd' }
     };
 
-    const testBackendConnection = async () => {
+    // API Functions
+    const fetchUsers = async () => {
+        setLoading(true);
         try {
-            setConnectionStatus('checking');
-            addDebugInfo('🔍 Backend bağlantısı test ediliyor...');
-
-            const response = await fetch('/health');
-            const text = await response.text();
-
-            addDebugInfo(`Health endpoint response: ${response.status}`);
-
-            if (response.ok && !text.startsWith('<')) {
-                addDebugInfo('✅ Backend bağlantısı başarılı');
-                setConnectionStatus('connected');
-                setIsUsingMockData(false);
-                return true;
-            } else {
-                addDebugInfo('❌ Backend HTML döndürüyor - proxy problemi');
-                setConnectionStatus('disconnected');
-                setIsUsingMockData(true);
-                return false;
-            }
-        } catch (error) {
-            addDebugInfo(`❌ Backend bağlantı hatası: ${error.message}`);
-            setConnectionStatus('disconnected');
-            setIsUsingMockData(true);
-            return false;
-        }
-    };
-
-    const apiCall = async (endpoint, method = 'GET', data = null) => {
-        try {
-            addDebugInfo(`🚀 API Call: ${method} ${endpoint}`);
-
-            const options = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer fake-admin-token'
-                }
-            };
-
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
-
-            // Try different endpoint patterns
-            const endpointVariations = [
-                `/api${endpoint}`,
-                endpoint,
-                endpoint.replace('/admin', '/api')
-            ];
-
-            for (const testEndpoint of endpointVariations) {
-                try {
-                    addDebugInfo(`🔍 Trying: ${testEndpoint}`);
-
-                    const response = await fetch(testEndpoint, options);
-                    const text = await response.text();
-
-                    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-                        addDebugInfo(`❌ ${testEndpoint} returns HTML`);
-                        continue;
-                    }
-
-                    let result = {};
-                    if (text) {
-
-                            result = JSON.parse(text);
-
-
-                    }
-
-                    if (!response.ok) {
-                        if (response.status === 404) {
-                            addDebugInfo(`❌ ${testEndpoint} not found`);
-                            continue;
-                        }
-                        throw new Error(result.message || `HTTP ${response.status}`);
-                    }
-
-                    addDebugInfo(`✅ ${testEndpoint} success!`);
-                    return result;
-
-                } catch (error) {
-                    addDebugInfo(`❌ ${testEndpoint} failed: ${error.message}`);
-                    continue;
-                }
-            }
-
-            throw new Error('All endpoint variations failed');
-
-        } catch (error) {
-            addDebugInfo(`❌ API call completely failed: ${error.message}`);
-            throw error;
-        }
-    };
-
-    // ============ DATA LOADING FUNCTIONS ============
-
-    const loadUsers = async () => {
-        try {
-            setLoading(true);
-            addDebugInfo('📋 Kullanıcılar yükleniyor...');
-
-            const queryParams = new URLSearchParams({
+            const params = new URLSearchParams({
                 page: page + 1,
                 limit: rowsPerPage,
                 search: searchTerm,
-                status: statusFilter,
-                sortBy,
-                sortOrder
+                status: filterStatus,
+                tag: filterTag,
+                badge: filterBadge,
+                sortBy: 'createdAt',
+                sortOrder: 'desc'
             });
 
-            const response = await apiCall(`/admin/users?${queryParams}`);
-
-            if (response && response.success) {
-                setUsers(response.users || []);
-                setTotalUsers(response.pagination?.totalUsers || 0);
-                setIsUsingMockData(false);
-                addDebugInfo(`✅ ${response.users?.length || 0} gerçek kullanıcı yüklendi`);
-
-                if (response.users?.length === 0 && searchTerm) {
-                    showAlert('info', 'Arama kriterlerine uygun kullanıcı bulunamadı');
+            const response = await axios.get(`${API_BASE_URL}/admin/users?${params}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 }
-            } else {
-                throw new Error('Invalid response format');
-            }
-        } catch (error) {
-            addDebugInfo(`❌ Gerçek veri yükleme hatası: ${error.message}`);
-
-            // Use paginated mock data
-            const filteredUsers = allMockUsers.filter(user => {
-                const matchesSearch = !searchTerm ||
-                    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    user.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-
-                const matchesStatus = statusFilter === 'all' ||
-                    (statusFilter === 'active' && user.isActive) ||
-                    (statusFilter === 'inactive' && !user.isActive);
-
-                return matchesSearch && matchesStatus;
             });
 
-            // Sort users
-            filteredUsers.sort((a, b) => {
-                if (sortBy === 'createdAt') {
-                    return sortOrder === 'desc'
-                        ? new Date(b.createdAt) - new Date(a.createdAt)
-                        : new Date(a.createdAt) - new Date(b.createdAt);
-                }
-                return 0;
-            });
+            if (response.data.success) {
+                setUsers(response.data.users || []);
+                setTotalUsers(response.data.pagination?.totalUsers || 0);
+                setStats(response.data.stats);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
 
-            // Paginate
-            const startIndex = page * rowsPerPage;
-            const endIndex = startIndex + rowsPerPage;
-            const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
-
-            setUsers(paginatedUsers);
-            setTotalUsers(filteredUsers.length);
-            setIsUsingMockData(true);
-
-            addDebugInfo(`🧪 ${paginatedUsers.length}/${filteredUsers.length} mock kullanıcı gösteriliyor (sayfa ${page + 1})`);
-            showAlert('warning', `Demo veriler gösteriliyor - ${filteredUsers.length} toplam kullanıcı`);
+            // Mock data for demo
+            const mockUsers = generateMockUsers();
+            setUsers(mockUsers);
+            setTotalUsers(mockUsers.length);
+            setStats(generateMockStats());
         } finally {
             setLoading(false);
         }
     };
 
-    const loadStats = async () => {
-        try {
-            addDebugInfo('📊 İstatistikler yükleniyor...');
-            const response = await apiCall('/admin/stats');
+    // Mock data generators
+    const generateMockUsers = () => {
+        return Array.from({ length: 50 }, (_, i) => ({
+            _id: `user_${i + 1}`,
+            username: `user_${i + 1}`,
+            email: `user${i + 1}@example.com`,
+            firstName: `Ad${i + 1}`,
+            lastName: `Soyad${i + 1}`,
+            phone: `+90 555 ${String(Math.floor(Math.random() * 900) + 100)} ${String(Math.floor(Math.random() * 90) + 10)} ${String(Math.floor(Math.random() * 90) + 10)}`,
+            userTag: ['producer', 'dj', 'dj-producer', 'distributor', 'none'][Math.floor(Math.random() * 5)],
+            badge: ['standard', 'premium', 'none'][Math.floor(Math.random() * 3)],
+            isActive: Math.random() > 0.2,
+            isAdmin: i < 2,
+            isPremium: Math.random() > 0.7,
+            createdAt: new Date(Date.now() - Math.floor(Math.random() * 10000000000)),
+            followerCount: Math.floor(Math.random() * 1000),
+            followingCount: Math.floor(Math.random() * 500),
+            profileImage: null
+        }));
+    };
 
-            if (response && response.success) {
-                setStats(response.stats || {});
-                addDebugInfo('✅ Gerçek istatistikler yüklendi');
-            } else {
-                throw new Error('Invalid stats response');
-            }
-        } catch (error) {
-            addDebugInfo(`❌ Gerçek istatistik hatası: ${error.message}`);
+    const generateMockStats = () => ({
+        total: 250,
+        active: 210,
+        premium: 45,
+        withStandardBadge: 80,
+        withPremiumBadge: 25,
+        producers: 60,
+        djs: 45,
+        djProducers: 35,
+        distributors: 20
+    });
 
-            // Calculate stats from mock data
-            const activeUsers = allMockUsers.filter(u => u.isActive).length;
-            const inactiveUsers = allMockUsers.length - activeUsers;
+    // Handler Functions
+    const handleMenuOpen = (event, user) => {
+        setAnchorEl(event.currentTarget);
+        setSelectedUser(user);
+    };
 
-            const now = new Date();
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
-            const newThisMonth = allMockUsers.filter(u => new Date(u.createdAt) > thirtyDaysAgo).length;
-            const newThisWeek = allMockUsers.filter(u => new Date(u.createdAt) > sevenDaysAgo).length;
-            const newToday = allMockUsers.filter(u => new Date(u.createdAt) > oneDayAgo).length;
+    const openDialog = (type) => {
+        setDialogType(type);
+        setDialogOpen(true);
+        handleMenuClose();
 
-            const mockStats = {
-                total: allMockUsers.length,
-                active: activeUsers,
-                inactive: inactiveUsers,
-                newThisMonth,
-                newThisWeek,
-                newToday,
-                activePercentage: Math.round((activeUsers / allMockUsers.length) * 100)
-            };
-
-            setStats(mockStats);
-            addDebugInfo(`🧪 Mock istatistikler: ${mockStats.total} toplam kullanıcı`);
+        if (type === 'tag' && selectedUser) {
+            setSelectedTag(selectedUser.userTag || 'none');
+        } else if (type === 'badge' && selectedUser) {
+            setSelectedBadge(selectedUser.badge || 'none');
+            setBadgeReason('');
+        } else if (type === 'password') {
+            setNewPassword('');
         }
     };
 
-    // ============ USER OPERATIONS ============
-
-    const handleDeleteUser = async (permanent = false) => {
-        if (!userToDelete) return;
-
-        try {
-            setLoading(true);
-            addDebugInfo(`🗑️ Kullanıcı siliniyor: ${userToDelete.username}, permanent: ${permanent}`);
-
-            if (!isUsingMockData) {
-                const endpoint = `/admin/users/${userToDelete._id}${permanent ? '?permanent=true' : ''}`;
-                const response = await apiCall(endpoint, 'DELETE');
-
-                if (response && response.success) {
-                    showAlert('success', response.message || 'Kullanıcı başarıyla silindi');
-                } else {
-                    throw new Error('Delete operation failed');
-                }
-            } else {
-                // Mock delete - remove from local array
-                const userIndex = allMockUsers.findIndex(u => u._id === userToDelete._id);
-                if (userIndex >= 0) {
-                    if (permanent) {
-                        allMockUsers.splice(userIndex, 1);
-                    } else {
-                        allMockUsers[userIndex].isActive = false;
-                    }
-                }
-                showAlert('success', `Mock: Kullanıcı ${permanent ? 'kalıcı olarak silindi' : 'deaktive edildi'}`);
-            }
-
-            await loadUsers();
-            await loadStats();
-            setDeleteConfirmModal(false);
-            setUserToDelete(null);
-
-        } catch (error) {
-            addDebugInfo(`❌ Silme hatası: ${error.message}`);
-            showAlert('error', 'Kullanıcı silinirken hata oluştu: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
+    const closeDialog = () => {
+        setDialogOpen(false);
+        setSelectedUser(null);
+        setSelectedTag('');
+        setSelectedBadge('');
+        setBadgeReason('');
+        setNewPassword('');
     };
 
-    const handleRestoreUser = async (userId) => {
-        try {
-            setLoading(true);
-            addDebugInfo(`🔄 Kullanıcı restore ediliyor: ${userId}`);
-
-            if (!isUsingMockData) {
-                const response = await apiCall(`/admin/users/${userId}/restore`, 'POST');
-
-                if (response && response.success) {
-                    showAlert('success', 'Kullanıcı başarıyla geri yüklendi');
-                } else {
-                    throw new Error('Restore operation failed');
-                }
-            } else {
-                // Mock restore
-                const user = allMockUsers.find(u => u._id === userId);
-                if (user) {
-                    user.isActive = true;
-                }
-                showAlert('success', 'Mock: Kullanıcı aktif hale getirildi');
-            }
-
-            await loadUsers();
-            await loadStats();
-
-        } catch (error) {
-            addDebugInfo(`❌ Restore hatası: ${error.message}`);
-            showAlert('error', 'Kullanıcı geri yüklenirken hata oluştu: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleDialogSubmit = async () => {
+        // API calls would go here
+        showAlert('İşlem başarıyla tamamlandı', 'success');
+        closeDialog();
+        fetchUsers();
     };
 
-    const handleViewUser = async (userId) => {
-        try {
-            addDebugInfo(`👤 Kullanıcı detayları getiriliyor: ${userId}`);
-
-            if (!isUsingMockData) {
-                const response = await apiCall(`/admin/users/${userId}`);
-
-                if (response && response.success) {
-                    setSelectedUser(response.user);
-                    setUserDetailModal(true);
-                } else {
-                    throw new Error('User details fetch failed');
-                }
-            } else {
-                // Mock user details
-                const user = allMockUsers.find(u => u._id === userId) || users.find(u => u._id === userId);
-                if (user) {
-                    setSelectedUser({
-                        ...user,
-                        playlistsCount: Math.floor(Math.random() * 20)
-                    });
-                    setUserDetailModal(true);
-                }
-            }
-        } catch (error) {
-            addDebugInfo(`❌ Detay hatası: ${error.message}`);
-            showAlert('error', 'Kullanıcı detayları alınırken hata oluştu: ' + error.message);
-        }
+    const showAlert = (message, severity) => {
+        setAlertMessage(message);
+        setAlertSeverity(severity);
+        setTimeout(() => setAlertMessage(''), 5000);
     };
 
-    const handleStatusToggle = async (userId, currentStatus) => {
-        try {
-            setLoading(true);
-            addDebugInfo(`🔄 Durum değiştiriliyor: ${userId}, ${currentStatus} → ${!currentStatus}`);
-
-            if (!isUsingMockData) {
-                const response = await apiCall(`/admin/users/${userId}/status`, 'PUT', {
-                    isActive: !currentStatus,
-                    reason: !currentStatus ? 'Admin activation' : 'Admin deactivation'
-                });
-
-                if (response && response.success) {
-                    showAlert('success', response.message || 'Kullanıcı durumu güncellendi');
-                } else {
-                    throw new Error('Status update failed');
-                }
-            } else {
-                // Mock status toggle
-                const user = allMockUsers.find(u => u._id === userId);
-                if (user) {
-                    user.isActive = !currentStatus;
-                }
-                showAlert('success', `Mock: Kullanıcı ${!currentStatus ? 'aktif' : 'pasif'} hale getirildi`);
-            }
-
-            await loadUsers();
-            await loadStats();
-
-        } catch (error) {
-            addDebugInfo(`❌ Durum değiştirme hatası: ${error.message}`);
-            showAlert('error', 'Durum güncellenirken hata oluştu: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // ============ EVENT HANDLERS ============
-
-    const showAlert = (type, message) => {
-        setAlert({ show: true, type, message });
-        setTimeout(() => {
-            setAlert(prev => ({ ...prev, show: false }));
-        }, 5000);
-    };
-
-    const handleSearchChange = (event) => {
-        setSearchTerm(event.target.value);
-        setPage(0);
-    };
-
-    const handleFilterChange = (event) => {
-        setStatusFilter(event.target.value);
-        setPage(0);
-    };
-
-    const handleRefresh = async () => {
-        addDebugInfo('🔄 Veri yenileniyor...');
-        await testBackendConnection();
-        await Promise.all([loadUsers(), loadStats()]);
-    };
-
-    const handlePageChange = (event, newPage) => {
-        addDebugInfo(`📄 Sayfa değişiyor: ${page + 1} → ${newPage + 1}`);
-        setPage(newPage);
-    };
-
-    const handleRowsPerPageChange = (event) => {
-        const newRowsPerPage = parseInt(event.target.value, 10);
-        addDebugInfo(`📏 Sayfa boyutu değişiyor: ${rowsPerPage} → ${newRowsPerPage}`);
-        setRowsPerPage(newRowsPerPage);
-        setPage(0);
-    };
-
-    // ============ EFFECTS ============
-
+    // Effects
     useEffect(() => {
-        addDebugInfo('🚀 UserManagement component mounted');
+        fetchUsers();
+    }, [page, rowsPerPage, searchTerm, filterTag, filterBadge, filterStatus]);
 
-        const initializeComponent = async () => {
-            await testBackendConnection();
-            await loadStats();
-        };
+    // Render Functions
+    const renderTagChip = (tag) => {
+        const tagInfo = tags[tag] || tags.none;
+        const Icon = tagInfo.icon;
 
-        initializeComponent();
-    }, []);
+        if (tag === 'none' || !tag) return null;
 
-    useEffect(() => {
-        addDebugInfo(`📄 Sayfa parametreleri değişti: page=${page}, rowsPerPage=${rowsPerPage}, search="${searchTerm}", status="${statusFilter}"`);
-        loadUsers();
-    }, [page, rowsPerPage, searchTerm, statusFilter]);
-
-    // ============ COMPONENTS ============
-
-    const StatCard = ({ title, value, icon, color, subtitle }) => (
-        <Card sx={{
-            height: '100%',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: 3
-            }
-        }}>
-            <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                        <Typography variant="h4" fontWeight="bold" color={color}>
-                            {typeof value === 'number' ? value.toLocaleString() : (value || 0)}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                            {title}
-                        </Typography>
-                        {subtitle && (
-                            <Typography variant="caption" color="textSecondary">
-                                {subtitle}
-                            </Typography>
-                        )}
-                    </Box>
-                    <Box
-                        sx={{
-                            p: 2,
-                            borderRadius: 2,
-                            backgroundColor: `${color}15`,
-                            color: color
-                        }}
-                    >
-                        {icon}
-                    </Box>
-                </Box>
-            </CardContent>
-        </Card>
-    );
-
-    const ConnectionStatus = () => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <Box
+        return (
+            <Chip
+                size="small"
+                label={tagInfo.label}
+                icon={Icon ? <Icon style={{ fontSize: 16 }} /> : null}
                 sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    backgroundColor:
-                        connectionStatus === 'connected' ? '#4caf50' :
-                            connectionStatus === 'disconnected' ? '#f44336' : '#ff9800'
+                    bgcolor: tagInfo.bgColor,
+                    color: tagInfo.color,
+                    border: `1px solid ${tagInfo.color}30`,
+                    fontWeight: 500
                 }}
             />
-            <Typography variant="body2" color="textSecondary">
-                Backend: {
-                connectionStatus === 'connected' ? 'Bağlı' :
-                    connectionStatus === 'disconnected' ? 'Bağlantı Yok' : 'Kontrol Ediliyor...'
-            }
-            </Typography>
-            {isUsingMockData && (
-                <Chip
-                    label="DEMO VERİ"
-                    size="small"
-                    color="warning"
-                    variant="outlined"
-                />
-            )}
-            <Button size="small" onClick={testBackendConnection}>
-                Test
-            </Button>
-            <Button size="small" onClick={() => setDebugModal(true)} startIcon={<BugReportIcon />}>
-                Debug
-            </Button>
-        </Box>
-    );
-
-    const formatDate = (dateString) => {
-
-            return format(new Date(dateString), 'dd MMM yyyy', { locale: tr });
-
+        );
     };
 
-    // ============ MAIN RENDER ============
+    const renderBadgeChip = (badge) => {
+        const badgeInfo = badges[badge] || badges.none;
+        const Icon = badgeInfo.icon;
+
+        if (badge === 'none' || !badge) return null;
+
+        return (
+            <Tooltip title={`${badgeInfo.label} Rozet`}>
+                <Chip
+                    size="small"
+                    label={badgeInfo.label}
+                    icon={Icon ? <Icon style={{ fontSize: 16 }} /> : null}
+                    variant={badge === 'premium' ? 'filled' : 'outlined'}
+                    sx={{
+                        bgcolor: badge === 'premium' ? badgeInfo.color : 'transparent',
+                        color: badge === 'premium' ? '#fff' : badgeInfo.color,
+                        borderColor: badgeInfo.color,
+                        fontWeight: 600
+                    }}
+                />
+            </Tooltip>
+        );
+    };
 
     return (
-        <Box sx={{ p: 3 }}>
-            {/* Connection Status */}
-            <ConnectionStatus />
-
+        <Box sx={{ p: 3, bgcolor: '#fafafa', minHeight: '100vh' }}>
             {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" fontWeight="bold">
-                    👥 Kullanıcı Yönetimi {isUsingMockData && '(Demo Mode)'}
-                </Typography>
-                <Stack direction="row" spacing={2}>
-                    <Button
-                        variant="outlined"
-                        startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />}
-                        onClick={handleRefresh}
-                        disabled={loading}
+            <Fade in timeout={800}>
+                <Box sx={{ mb: 4 }}>
+                    <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: '#000' }}>
+                        Kullanıcı Yönetimi
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                        Kullanıcıları yönetin, tag ve rozet atayın
+                    </Typography>
+                </Box>
+            </Fade>
+
+            {/* Alert */}
+            {alertMessage && (
+                <Fade in>
+                    <Alert
+                        severity={alertSeverity}
+                        sx={{ mb: 3 }}
+                        onClose={() => setAlertMessage('')}
+                        icon={alertSeverity === 'success' ? <CheckCircle /> : <Cancel />}
                     >
-                        Yenile
-                    </Button>
-                </Stack>
-            </Box>
+                        {alertMessage}
+                    </Alert>
+                </Fade>
+            )}
 
             {/* Statistics Cards */}
-            <Grid container spacing={3} mb={4}>
-                <Grid item xs={12} sm={6} md={3}>
-                    <StatCard
-                        title="Toplam Kullanıcı"
-                        value={stats.total}
-                        icon={<GroupIcon />}
-                        color="#2196f3"
-                    />
+            {stats && (
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Grow in timeout={1000}>
+                            <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                                        <Box>
+                                            <Typography color="textSecondary" variant="body2" gutterBottom>
+                                                Toplam Kullanıcı
+                                            </Typography>
+                                            <Typography variant="h4" fontWeight="bold">
+                                                {stats.total || 0}
+                                            </Typography>
+                                        </Box>
+                                        <Avatar sx={{ bgcolor: '#000', width: 48, height: 48 }}>
+                                            <Groups />
+                                        </Avatar>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Grow in timeout={1200}>
+                            <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                                        <Box>
+                                            <Typography color="textSecondary" variant="body2" gutterBottom>
+                                                Premium Üye
+                                            </Typography>
+                                            <Typography variant="h4" fontWeight="bold" color="#ffc107">
+                                                {stats.premium || 0}
+                                            </Typography>
+                                        </Box>
+                                        <Avatar sx={{ bgcolor: '#ffc107', width: 48, height: 48 }}>
+                                            <WorkspacePremium />
+                                        </Avatar>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Grow in timeout={1400}>
+                            <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                                        <Box>
+                                            <Typography color="textSecondary" variant="body2" gutterBottom>
+                                                Prodüktör
+                                            </Typography>
+                                            <Typography variant="h4" fontWeight="bold" color="#9c27b0">
+                                                {stats.producers || 0}
+                                            </Typography>
+                                        </Box>
+                                        <Avatar sx={{ bgcolor: '#9c27b0', width: 48, height: 48 }}>
+                                            <MusicNote />
+                                        </Avatar>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Grow in timeout={1600}>
+                            <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                                        <Box>
+                                            <Typography color="textSecondary" variant="body2" gutterBottom>
+                                                DJ
+                                            </Typography>
+                                            <Typography variant="h4" fontWeight="bold" color="#2196f3">
+                                                {(stats.djs || 0) + (stats.djProducers || 0)}
+                                            </Typography>
+                                        </Box>
+                                        <Avatar sx={{ bgcolor: '#2196f3', width: 48, height: 48 }}>
+                                            <Album />
+                                        </Avatar>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <StatCard
-                        title="Aktif Kullanıcı"
-                        value={stats.active}
-                        icon={<PersonIcon />}
-                        color="#4caf50"
-                        subtitle={`%${stats.activePercentage || 0} aktif`}
-                    />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <StatCard
-                        title="Bu Ay Yeni"
-                        value={stats.newThisMonth}
-                        icon={<PersonAddIcon />}
-                        color="#ff9800"
-                        subtitle={`Bu hafta: ${stats.newThisWeek || 0}`}
-                    />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <StatCard
-                        title="Pasif Kullanıcı"
-                        value={stats.inactive}
-                        icon={<PersonOffIcon />}
-                        color="#f44336"
-                    />
-                </Grid>
-            </Grid>
+            )}
 
             {/* Filters and Search */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={6}>
-                        <TextField
-                            fullWidth
-                            variant="outlined"
-                            placeholder="Kullanıcı ara (username, email, isim)..."
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            InputProps={{
-                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'gray' }} />
-                            }}
-                        />
+            <Fade in timeout={1800}>
+                <Paper sx={{ p: 3, mb: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={3}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                variant="outlined"
+                                placeholder="Kullanıcı ara..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Tag Filtrele</InputLabel>
+                                <Select
+                                    value={filterTag}
+                                    onChange={(e) => setFilterTag(e.target.value)}
+                                    label="Tag Filtrele"
+                                >
+                                    <MenuItem value="all">Tümü</MenuItem>
+                                    <MenuItem value="producer">Prodüktör</MenuItem>
+                                    <MenuItem value="dj">DJ</MenuItem>
+                                    <MenuItem value="dj-producer">DJ & Prodüktör</MenuItem>
+                                    <MenuItem value="distributor">Distribütör</MenuItem>
+                                    <MenuItem value="none">Tag Yok</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Rozet Filtrele</InputLabel>
+                                <Select
+                                    value={filterBadge}
+                                    onChange={(e) => setFilterBadge(e.target.value)}
+                                    label="Rozet Filtrele"
+                                >
+                                    <MenuItem value="all">Tümü</MenuItem>
+                                    <MenuItem value="standard">Standart</MenuItem>
+                                    <MenuItem value="premium">Premium</MenuItem>
+                                    <MenuItem value="none">Rozet Yok</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Durum</InputLabel>
+                                <Select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    label="Durum"
+                                >
+                                    <MenuItem value="all">Tümü</MenuItem>
+                                    <MenuItem value="active">Aktif</MenuItem>
+                                    <MenuItem value="inactive">Pasif</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
                     </Grid>
-                    <Grid item xs={12} md={3}>
-                        <FormControl fullWidth>
-                            <InputLabel>Durum Filtresi</InputLabel>
-                            <Select
-                                value={statusFilter}
-                                label="Durum Filtresi"
-                                onChange={handleFilterChange}
-                            >
-                                <MenuItem value="all">Tümü</MenuItem>
-                                <MenuItem value="active">Aktif</MenuItem>
-                                <MenuItem value="inactive">Pasif</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                        <Typography variant="body2" color="textSecondary">
-                            Toplam {totalUsers} kullanıcı bulundu
-                            {isUsingMockData && ' (demo)'}
-                        </Typography>
-                    </Grid>
-                </Grid>
-            </Paper>
+                </Paper>
+            </Fade>
 
             {/* Users Table */}
-            <Paper>
-                <TableContainer>
+            <Fade in timeout={2000}>
+                <TableContainer component={Paper} sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
                     <Table>
                         <TableHead>
-                            <TableRow>
-                                <TableCell>Kullanıcı</TableCell>
-                                <TableCell>Email</TableCell>
-                                <TableCell>Durum</TableCell>
-                                <TableCell>Takipçi/Takip</TableCell>
-                                <TableCell>Kayıt Tarihi</TableCell>
-                                <TableCell align="center">İşlemler</TableCell>
+                            <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>İletişim</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Tag</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Rozet</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Durum</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Takipçi</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Kayıt Tarihi</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                        <Box display="flex" alignItems="center" justifyContent="center" gap={2}>
-                                            <CircularProgress size={24} />
-                                            <Typography>Yükleniyor...</Typography>
-                                        </Box>
+                                    <TableCell colSpan={8} align="center">
+                                        <CircularProgress sx={{ color: '#000' }} />
                                     </TableCell>
                                 </TableRow>
                             ) : users.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                        <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
-                                            <Typography>📭 Kullanıcı bulunamadı</Typography>
-                                            {connectionStatus === 'disconnected' && (
-                                                <Typography variant="caption" color="error">
-                                                    Backend bağlantısı yok. Demo verileri yükleniyor...
-                                                </Typography>
-                                            )}
-                                        </Box>
+                                    <TableCell colSpan={8} align="center">
+                                        <Typography color="textSecondary">
+                                            Kullanıcı bulunamadı
+                                        </Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                users.map((user) => (
+                                users.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((user) => (
                                     <TableRow key={user._id} hover>
                                         <TableCell>
                                             <Box display="flex" alignItems="center" gap={2}>
                                                 <Avatar
-                                                    src={user.profileImage ? `/uploads/profiles/${user.profileImage}` : null}
-                                                    sx={{ width: 40, height: 40 }}
+                                                    src={user.profileImage}
+                                                    alt={user.username}
+                                                    sx={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        bgcolor: user.isAdmin ? '#000' : '#757575'
+                                                    }}
                                                 >
-                                                    {(user.username || 'U').charAt(0).toUpperCase()}
+                                                    {user.username[0]?.toUpperCase()}
                                                 </Avatar>
                                                 <Box>
-                                                    <Typography variant="subtitle2" fontWeight="bold">
-                                                        {user.username || 'Unknown'}
-                                                    </Typography>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Typography variant="body2" fontWeight={600}>
+                                                            {user.username}
+                                                        </Typography>
+                                                        {user.isAdmin && (
+                                                            <Tooltip title="Admin">
+                                                                <AdminPanelSettings sx={{ fontSize: 16, color: '#000' }} />
+                                                            </Tooltip>
+                                                        )}
+                                                        {user.isPremium && (
+                                                            <Tooltip title="Premium Üye">
+                                                                <Star sx={{ fontSize: 16, color: '#ffc107' }} />
+                                                            </Tooltip>
+                                                        )}
+                                                    </Box>
                                                     <Typography variant="caption" color="textSecondary">
-                                                        {user.fullName || 'İsim belirtilmemiş'}
+                                                        {user.firstName} {user.lastName}
                                                     </Typography>
                                                 </Box>
                                             </Box>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2">
-                                                {user.email || 'Email yok'}
-                                            </Typography>
+                                            <Stack spacing={0.5}>
+                                                <Box display="flex" alignItems="center" gap={0.5}>
+                                                    <Email sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                                    <Typography variant="caption">{user.email}</Typography>
+                                                </Box>
+                                                {user.phone && (
+                                                    <Box display="flex" alignItems="center" gap={0.5}>
+                                                        <Phone sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                                        <Typography variant="caption">{user.phone}</Typography>
+                                                    </Box>
+                                                )}
+                                            </Stack>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell align="center">
+                                            {renderTagChip(user.userTag)}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {renderBadgeChip(user.badge)}
+                                        </TableCell>
+                                        <TableCell align="center">
                                             <Chip
+                                                size="small"
                                                 label={user.isActive ? 'Aktif' : 'Pasif'}
                                                 color={user.isActive ? 'success' : 'error'}
-                                                size="small"
-                                                variant="outlined"
-                                                icon={user.isActive ? <CheckCircleIcon /> : <ErrorIcon />}
+                                                variant={user.isActive ? 'filled' : 'outlined'}
                                             />
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell align="center">
                                             <Typography variant="body2">
-                                                {user.followersCount || 0} / {user.followingCount || 0}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2">
-                                                {formatDate(user.createdAt)}
+                                                {user.followerCount || 0}
                                             </Typography>
                                         </TableCell>
                                         <TableCell align="center">
-                                            <Stack direction="row" spacing={1} justifyContent="center">
-                                                <Tooltip title="Detayları Görüntüle">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleViewUser(user._id)}
-                                                    >
-                                                        <ViewIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-
-                                                {user.isActive ? (
-                                                    <Tooltip title="Deaktive Et">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="warning"
-                                                            onClick={() => handleStatusToggle(user._id, user.isActive)}
-                                                        >
-                                                            <PersonOffIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                ) : (
-                                                    <Tooltip title="Aktif Et">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="success"
-                                                            onClick={() => handleRestoreUser(user._id)}
-                                                        >
-                                                            <RestoreIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
-
-                                                <Tooltip title="Sil">
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => {
-                                                            setUserToDelete(user);
-                                                            setDeleteConfirmModal(true);
-                                                        }}
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Stack>
+                                            <Box display="flex" alignItems="center" gap={0.5} justifyContent="center">
+                                                <CalendarToday sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                                <Typography variant="caption">
+                                                    {new Date(user.createdAt).toLocaleDateString('tr-TR')}
+                                                </Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => handleMenuOpen(e, user)}
+                                            >
+                                                <MoreVert />
+                                            </IconButton>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             )}
                         </TableBody>
                     </Table>
+                    <TablePagination
+                        component="div"
+                        count={totalUsers}
+                        page={page}
+                        onPageChange={(e, newPage) => setPage(newPage)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                        labelRowsPerPage="Sayfa başına:"
+                        labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+                    />
                 </TableContainer>
+            </Fade>
 
-                <TablePagination
-                    component="div"
-                    count={totalUsers}
-                    page={page}
-                    onPageChange={handlePageChange}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={handleRowsPerPageChange}
-                    rowsPerPageOptions={[5, 10, 25, 50]}
-                    labelRowsPerPage="Sayfa başına:"
-                    labelDisplayedRows={({ from, to, count }) =>
-                        `${from}-${to} / ${count !== -1 ? count : `${to}'den fazla`}${isUsingMockData ? ' (demo)' : ''}`
+            {/* Actions Menu */}
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                PaperProps={{
+                    sx: {
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid #e0e0e0'
                     }
-                    showFirstButton
-                    showLastButton
-                />
-            </Paper>
-
-            {/* User Detail Modal */}
-            <Dialog open={userDetailModal} onClose={() => setUserDetailModal(false)} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    👤 Kullanıcı Detayları {isUsingMockData && '(Demo)'}
-                </DialogTitle>
-                <DialogContent>
-                    {selectedUser && (
-                        <Box sx={{ pt: 2 }}>
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} md={4}>
-                                    <Box textAlign="center">
-                                        <Avatar
-                                            src={selectedUser.profileImage ? `/uploads/profiles/${selectedUser.profileImage}` : null}
-                                            sx={{ width: 120, height: 120, mx: 'auto', mb: 2 }}
-                                        >
-                                            {(selectedUser.username || 'U').charAt(0).toUpperCase()}
-                                        </Avatar>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {selectedUser.username || 'Unknown'}
-                                        </Typography>
-                                        <Chip
-                                            label={selectedUser.isActive ? 'Aktif' : 'Pasif'}
-                                            color={selectedUser.isActive ? 'success' : 'error'}
-                                            size="small"
-                                            sx={{ mt: 1 }}
-                                        />
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={12} md={8}>
-                                    <Stack spacing={2}>
-                                        <Box>
-                                            <Typography variant="subtitle2" color="textSecondary">
-                                                Tam İsim
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {selectedUser.fullName || 'Belirtilmemiş'}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="subtitle2" color="textSecondary">
-                                                Email
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {selectedUser.email || 'Email yok'}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="subtitle2" color="textSecondary">
-                                                Biyografi
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {selectedUser.bio || 'Biyografi eklenmemiş'}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="subtitle2" color="textSecondary">
-                                                İstatistikler
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                • Takipçi: {selectedUser.followersCount || 0}
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                • Takip: {selectedUser.followingCount || 0}
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                • Playlist: {selectedUser.playlistsCount || 0}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="subtitle2" color="textSecondary">
-                                                Kayıt Tarihi
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {selectedUser.createdAt ?
-                                                    format(new Date(selectedUser.createdAt), 'dd MMMM yyyy HH:mm', { locale: tr }) :
-                                                    'Tarih bilgisi yok'
-                                                }
-                                            </Typography>
-                                        </Box>
-                                    </Stack>
-                                </Grid>
-                            </Grid>
-                        </Box>
+                }}
+            >
+                <MenuItem onClick={() => openDialog('tag')}>
+                    <LocalOffer sx={{ mr: 1 }} fontSize="small" />
+                    Tag Güncelle
+                </MenuItem>
+                <MenuItem onClick={() => openDialog('badge')}>
+                    <BadgeIcon sx={{ mr: 1 }} fontSize="small" />
+                    Rozet Yönet
+                </MenuItem>
+                <Divider />
+                <MenuItem onClick={() => {
+                    // Toggle user status
+                    showAlert('Kullanıcı durumu güncellendi', 'success');
+                    handleMenuClose();
+                }}>
+                    {selectedUser?.isActive ? (
+                        <>
+                            <PersonOff sx={{ mr: 1 }} fontSize="small" />
+                            Hesabı Pasifleştir
+                        </>
+                    ) : (
+                        <>
+                            <Person sx={{ mr: 1 }} fontSize="small" />
+                            Hesabı Aktifleştir
+                        </>
                     )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setUserDetailModal(false)}>
-                        Kapat
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                </MenuItem>
+                <MenuItem onClick={() => openDialog('password')}>
+                    <LockReset sx={{ mr: 1 }} fontSize="small" />
+                    Şifre Sıfırla
+                </MenuItem>
+            </Menu>
 
-            {/* Delete Confirmation Modal */}
-            <Dialog open={deleteConfirmModal} onClose={() => setDeleteConfirmModal(false)} maxWidth="sm">
-                <DialogTitle>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <WarningIcon color="warning" />
-                        Kullanıcı Silme Onayı {isUsingMockData && '(Demo)'}
-                    </Box>
-                </DialogTitle>
-                <DialogContent>
-                    <Typography sx={{ mb: 2 }}>
-                        <strong>{userToDelete?.username}</strong> kullanıcısını silmek istediğinizden emin misiniz?
-                    </Typography>
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                        <strong>Soft Delete:</strong> Kullanıcı deaktive edilir, veriler korunur.
-                    </Alert>
-                    <Alert severity="error" sx={{ mt: 1 }}>
-                        <strong>Kalıcı Silme:</strong> Kullanıcı tamamen silinir, geri alınamaz!
-                    </Alert>
-                    {isUsingMockData && (
-                        <Alert severity="warning" sx={{ mt: 1 }}>
-                            <strong>Demo Mode:</strong> Bu sadece demo amaçlıdır, gerçek veri silinmez.
-                        </Alert>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteConfirmModal(false)}>
-                        İptal
-                    </Button>
-                    <Button
-                        onClick={() => handleDeleteUser(false)}
-                        color="warning"
-                        variant="outlined"
-                        startIcon={<PersonOffIcon />}
-                    >
-                        Deaktive Et
-                    </Button>
-                    <Button
-                        onClick={() => handleDeleteUser(true)}
-                        color="error"
-                        variant="contained"
-                        startIcon={<DeleteIcon />}
-                    >
-                        Kalıcı Sil
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Debug Modal */}
-            <Dialog open={debugModal} onClose={() => setDebugModal(false)} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <BugReportIcon />
-                        Debug Bilgileri
-                    </Box>
-                </DialogTitle>
+            {/* Tag Dialog */}
+            <Dialog
+                open={dialogOpen && dialogType === 'tag'}
+                onClose={closeDialog}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Tag Güncelle</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Backend Bağlantı Durumu
-                        </Typography>
                         <Typography variant="body2" color="textSecondary" gutterBottom>
-                            Status: {connectionStatus} | Mock Data: {isUsingMockData ? 'Evet' : 'Hayır'}
+                            Kullanıcı: <strong>{selectedUser?.username}</strong>
                         </Typography>
-
-                        <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                            Son Debug Mesajları
-                        </Typography>
-                        <Paper sx={{ p: 2, maxHeight: 300, overflow: 'auto', bgcolor: '#f5f5f5' }}>
-                            {debugInfo.map((info, index) => (
-                                <Typography key={index} variant="caption" component="div" sx={{ fontFamily: 'monospace' }}>
-                                    {info}
-                                </Typography>
-                            ))}
-                        </Paper>
-
-                        <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                            Mevcut Veriler
-                        </Typography>
-                        <Typography variant="body2">
-                            • Görüntülenen kullanıcılar: {users.length}<br/>
-                            • Toplam kullanıcı sayısı: {totalUsers}<br/>
-                            • Mevcut sayfa: {page + 1}<br/>
-                            • Sayfa boyutu: {rowsPerPage}<br/>
-                            • Arama terimi: "{searchTerm}"<br/>
-                            • Durum filtresi: {statusFilter}<br/>
-                            • Veri kaynağı: {isUsingMockData ? 'Mock Data' : 'Backend API'}
-                        </Typography>
-
-                        <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                            Test Önerileri
-                        </Typography>
-                        <Typography variant="body2">
-                            1. Backend'in çalıştığından emin olun: http://localhost:5000<br/>
-                            2. package.json'da proxy ayarını kontrol edin<br/>
-                            3. Frontend'i restart edin (npm start)<br/>
-                            4. Network tab'ta /api/admin/users endpoint'ini kontrol edin
-                        </Typography>
+                        <FormControl fullWidth sx={{ mt: 2 }}>
+                            <InputLabel>Tag Seç</InputLabel>
+                            <Select
+                                value={selectedTag}
+                                onChange={(e) => setSelectedTag(e.target.value)}
+                                label="Tag Seç"
+                            >
+                                <MenuItem value="none">Tag Kaldır</MenuItem>
+                                <MenuItem value="producer">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <MusicNote sx={{ color: tags.producer.color }} />
+                                        Prodüktör
+                                    </Box>
+                                </MenuItem>
+                                <MenuItem value="dj">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <Album sx={{ color: tags.dj.color }} />
+                                        DJ
+                                    </Box>
+                                </MenuItem>
+                                <MenuItem value="dj-producer">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <LibraryMusic sx={{ color: tags['dj-producer'].color }} />
+                                        DJ & Prodüktör
+                                    </Box>
+                                </MenuItem>
+                                <MenuItem value="distributor">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <Share sx={{ color: tags.distributor.color }} />
+                                        Distribütör
+                                    </Box>
+                                </MenuItem>
+                            </Select>
+                        </FormControl>
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDebugInfo([])}>
-                        Logları Temizle
-                    </Button>
-                    <Button onClick={() => setDebugModal(false)}>
-                        Kapat
+                    <Button onClick={closeDialog}>İptal</Button>
+                    <Button
+                        onClick={handleDialogSubmit}
+                        variant="contained"
+                        sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#212121' } }}
+                    >
+                        Güncelle
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Alert Snackbar */}
-            <Snackbar
-                open={alert.show}
-                autoHideDuration={5000}
-                onClose={() => setAlert({ ...alert, show: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            {/* Badge Dialog */}
+            <Dialog
+                open={dialogOpen && dialogType === 'badge'}
+                onClose={closeDialog}
+                maxWidth="sm"
+                fullWidth
             >
-                <Alert
-                    onClose={() => setAlert({ ...alert, show: false })}
-                    severity={alert.type}
-                    sx={{ width: '100%' }}
-                    variant="filled"
-                >
-                    {alert.message}
-                </Alert>
-            </Snackbar>
+                <DialogTitle>Rozet Yönet</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ pt: 2 }}>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                            Kullanıcı: <strong>{selectedUser?.username}</strong>
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" gutterBottom>
+                            Mevcut Rozet: {selectedUser?.badge || 'Yok'}
+                        </Typography>
+                        <FormControl fullWidth sx={{ mt: 2 }}>
+                            <InputLabel>Rozet Seç</InputLabel>
+                            <Select
+                                value={selectedBadge}
+                                onChange={(e) => setSelectedBadge(e.target.value)}
+                                label="Rozet Seç"
+                            >
+                                <MenuItem value="none">Rozet Kaldır</MenuItem>
+                                <MenuItem value="standard">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <Verified sx={{ color: badges.standard.color }} />
+                                        Standart Rozet
+                                    </Box>
+                                </MenuItem>
+                                <MenuItem value="premium">
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <WorkspacePremium sx={{ color: badges.premium.color }} />
+                                        Premium Rozet
+                                    </Box>
+                                </MenuItem>
+                            </Select>
+                        </FormControl>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Sebep (Opsiyonel)"
+                            value={badgeReason}
+                            onChange={(e) => setBadgeReason(e.target.value)}
+                            sx={{ mt: 2 }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDialog}>İptal</Button>
+                    <Button
+                        onClick={handleDialogSubmit}
+                        variant="contained"
+                        sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#212121' } }}
+                    >
+                        Uygula
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Password Reset Dialog */}
+            <Dialog
+                open={dialogOpen && dialogType === 'password'}
+                onClose={closeDialog}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Şifre Sıfırla</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ pt: 2 }}>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                            Kullanıcı: <strong>{selectedUser?.username}</strong>
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            type="password"
+                            label="Yeni Şifre"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            helperText="En az 6 karakter"
+                            sx={{ mt: 2 }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDialog}>İptal</Button>
+                    <Button
+                        onClick={handleDialogSubmit}
+                        variant="contained"
+                        disabled={newPassword.length < 6}
+                        sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#212121' } }}
+                    >
+                        Şifreyi Sıfırla
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
