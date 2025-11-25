@@ -35,7 +35,8 @@ import {
     TrendingUp,
     MusicNote,
     Group,
-    PlayCircle
+    PlayCircle,
+    MicExternalOn as ArtistIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -55,6 +56,16 @@ const menuItems = [
         icon: <MusicAddIcon />,
         path: '/admin/music',
         description: 'Müzik Ekleme ve Düzenleme'
+    },
+    {
+        id: 'artists',
+        title: 'Artist Yönetimi',
+        icon: <ArtistIcon />,
+        path: '/admin/artists',
+        description: 'Sanatçı Profilleri',
+        badge: null,
+        badgeColor: 'warning',
+        dynamicBadge: true // Pending claims sayısını gösterecek
     },
     {
         id: 'playlists',

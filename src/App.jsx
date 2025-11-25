@@ -11,7 +11,8 @@ import { Playlists } from "./pages/Playlists.jsx";
 import SampleBank from "./pages/SampleBank.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import StoreManagement from "./pages/StoreManagement.jsx";
-import UserManagement from "./pages/UserManagement.jsx"; // YENİ EKLENEN
+import UserManagement from "./pages/UserManagement.jsx";
+import ArtistManagement from "./pages/ArtistManagement.jsx"; // YENİ EKLENEN
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -171,7 +172,9 @@ function App() {
                             <Route path="notifications" element={<Notifications />} />
                             <Route path="playlists" element={<Playlists />} />
                             <Route path="store" element={<StoreManagement />} />
-                            <Route path="users" element={<UserManagement />} /> {/* YENİ EKLENEN */}
+                            <Route path="users" element={<UserManagement />} />
+                            <Route path="admin/artists" element={<ArtistManagement />} />
+
                             <Route path="settings" element={<div style={{ padding: '24px' }}>
                                 <h2>Ayarlar</h2>
                                 <p>Ayarlar sayfası yakında...</p>

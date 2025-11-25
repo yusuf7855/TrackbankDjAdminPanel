@@ -1,5 +1,6 @@
-// Dashboard.jsx - Modern Minimalist Platform Links System with Spotify (5 Platforms)
+// Dashboard.jsx - ARTIST SİSTEMİ EKLENMİŞ VERSİYON
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Grid,
@@ -50,13 +51,20 @@ import {
     Image as ImageIcon,
     Category as CategoryIcon,
     GraphicEq as SpotifyIcon,
-    Link as LinkIcon
+    Link as LinkIcon,
+    Person as PersonIcon,
+    VerifiedUser as VerifiedIcon,
+    PersonAdd as PersonAddIcon,
+    HowToReg as ClaimIcon,
+    MicExternalOn as ArtistIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
+
     const [stats, setStats] = useState({
         music: {
             total: 0,
@@ -84,11 +92,20 @@ const Dashboard = () => {
             user: 0,
             withCovers: 0
         },
+        // YENİ: Artist istatistikleri
+        artists: {
+            total: 0,
+            claimed: 0,
+            unclaimed: 0,
+            pendingClaims: 0,
+            verified: 0
+        },
         users: {
             total: 0,
             active: 0,
             premium: 0,
-            newToday: 0
+            newToday: 0,
+            verifiedArtists: 0
         },
         store: {
             totalListings: 0,
@@ -104,6 +121,7 @@ const Dashboard = () => {
     });
 
     const [recentActivity, setRecentActivity] = useState([]);
+    const [recentArtists, setRecentArtists] = useState([]);
     const [topGenres, setTopGenres] = useState([]);
     const [systemHealth] = useState({
         status: 'healthy',
@@ -172,13 +190,17 @@ const Dashboard = () => {
             setError(null);
 
             // Fetch real data from API
-            const [musicRes, playlistsRes] = await Promise.all([
-                axios.get(`${API_BASE_URL}/music`).catch(() => ({ data: { music: [] } })),
-                axios.get(`${API_BASE_URL}/playlists/admin`).catch(() => ({ data: { playlists: [] } }))
+            const [musicRes, playlistsRes, artistsRes, pendingClaimsRes] = await Promise.all([
+                axios.get(`${API_BASE_URL}/music`).catch(() => ({ data: { data: { musics: [] } } })),
+                axios.get(`${API_BASE_URL}/playlists/admin`).catch(() => ({ data: { data: { playlists: [] } } })),
+                axios.get(`${API_BASE_URL}/artists`).catch(() => ({ data: { data: { artists: [] } } })),
+                axios.get(`${API_BASE_URL}/artists/claims/pending`).catch(() => ({ data: { data: { claims: [] } } }))
             ]);
 
-            const musicData = musicRes.data.music || [];
-            const playlistData = playlistsRes.data.playlists || [];
+            const musicData = musicRes.data?.data?.musics || musicRes.data?.musics || musicRes.data?.music || [];
+            const playlistData = playlistsRes.data?.data?.playlists || playlistsRes.data?.playlists || [];
+            const artistData = artistsRes.data?.data?.artists || artistsRes.data?.artists || [];
+            const pendingClaims = pendingClaimsRes.data?.data?.claims || pendingClaimsRes.data?.claims || [];
 
             // Calculate music stats
             const musicStats = {
@@ -212,6 +234,15 @@ const Dashboard = () => {
                 withCovers: playlistData.filter(p => p.coverImage).length
             };
 
+            // YENİ: Calculate artist stats
+            const artistStats = {
+                total: artistData.length,
+                claimed: artistData.filter(a => a.claimStatus === 'claimed').length,
+                unclaimed: artistData.filter(a => a.claimStatus === 'unclaimed').length,
+                pendingClaims: pendingClaims.length,
+                verified: artistData.filter(a => a.isVerified).length
+            };
+
             // Top genres
             const genreData = Object.entries(musicStats.byGenre)
                 .map(([genre, count]) => ({
@@ -223,15 +254,22 @@ const Dashboard = () => {
                 }))
                 .sort((a, b) => b.count - a.count);
 
+            // Recent artists (son 5)
+            const sortedArtists = [...artistData]
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, 5);
+
             setStats({
                 music: musicStats,
                 platformLinks: platformStats,
                 playlists: playlistStats,
+                artists: artistStats,
                 users: {
                     total: 2847,
                     active: 1892,
                     premium: 456,
-                    newToday: 23
+                    newToday: 23,
+                    verifiedArtists: artistStats.claimed
                 },
                 store: {
                     totalListings: 89,
@@ -247,14 +285,15 @@ const Dashboard = () => {
             });
 
             setTopGenres(genreData);
+            setRecentArtists(sortedArtists);
 
-            // Mock activity data
+            // Activity data
             const mockActivity = [
                 { id: 1, activity: 'Yeni müzik eklendi', user: 'Admin', type: 'music', time: '2 dakika önce' },
-                { id: 2, activity: 'Admin playlist oluşturuldu', user: 'Admin', type: 'playlist', time: '5 dakika önce' },
-                { id: 3, activity: 'Spotify linki eklendi', user: 'Admin', type: 'platform', time: '10 dakika önce' },
-                { id: 4, activity: 'Cover image yüklendi', user: 'Admin', type: 'image', time: '15 dakika önce' },
-                { id: 5, activity: 'Yeni kullanıcı kaydı', user: 'NewUser_123', type: 'user', time: '20 dakika önce' }
+                { id: 2, activity: 'Yeni artist oluşturuldu', user: 'Admin', type: 'artist', time: '5 dakika önce' },
+                { id: 3, activity: 'Claim başvurusu alındı', user: 'User_123', type: 'claim', time: '10 dakika önce' },
+                { id: 4, activity: 'Admin playlist oluşturuldu', user: 'Admin', type: 'playlist', time: '15 dakika önce' },
+                { id: 5, activity: 'Artist profili güncellendi', user: 'Admin', type: 'artist', time: '20 dakika önce' }
             ];
 
             setRecentActivity(mockActivity);
@@ -270,8 +309,13 @@ const Dashboard = () => {
 
     const getPlatformCoverage = () => {
         const totalPlatforms = Object.values(stats.platformLinks).reduce((sum, count) => sum + count, 0);
-        const maxPossible = stats.music.total * 5; // 5 platforms per music
+        const maxPossible = stats.music.total * 5;
         return maxPossible > 0 ? ((totalPlatforms / maxPossible) * 100).toFixed(1) : 0;
+    };
+
+    const getClaimRate = () => {
+        if (stats.artists.total === 0) return 0;
+        return ((stats.artists.claimed / stats.artists.total) * 100).toFixed(1);
     };
 
     if (loading) {
@@ -303,10 +347,25 @@ const Dashboard = () => {
                             TrackBang Dashboard
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Music Management • 5 Platform Support • Modern Analytics
+                            Music Management • Artist System • 5 Platform Support
                         </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        {/* Pending Claims Alert */}
+                        {stats.artists.pendingClaims > 0 && (
+                            <Chip
+                                icon={<ClaimIcon />}
+                                label={`${stats.artists.pendingClaims} Bekleyen Claim`}
+                                sx={{
+                                    bgcolor: '#FF9800',
+                                    color: '#fff',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    '&:hover': { bgcolor: '#F57C00' }
+                                }}
+                                onClick={() => navigate('/admin/artists')}
+                            />
+                        )}
                         <Chip
                             icon={<SpeedIcon />}
                             label={systemHealth.responseTime}
@@ -357,11 +416,14 @@ const Dashboard = () => {
                             transition: 'all 0.3s',
                             bgcolor: '#fff',
                             border: '1px solid #e0e0e0',
+                            cursor: 'pointer',
                             '&:hover': {
                                 transform: 'translateY(-4px)',
                                 boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
                             }
-                        }}>
+                        }}
+                              onClick={() => navigate('/admin/music')}
+                        >
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                     <Avatar sx={{ bgcolor: '#000', mr: 2, width: 56, height: 56 }}>
@@ -405,6 +467,64 @@ const Dashboard = () => {
                     </Fade>
                 </Grid>
 
+                {/* YENİ: Artists Card */}
+                <Grid item xs={12} sm={6} md={3}>
+                    <Grow in timeout={1100}>
+                        <Card sx={{
+                            height: '100%',
+                            transition: 'all 0.3s',
+                            bgcolor: '#fff',
+                            border: '1px solid #e0e0e0',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+                            }
+                        }}
+                              onClick={() => navigate('/admin/artists')}
+                        >
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Avatar sx={{ bgcolor: '#7C3AED', mr: 2, width: 56, height: 56 }}>
+                                        <ArtistIcon />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h4" fontWeight="bold" color="#7C3AED">
+                                            {stats.artists.total}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Toplam Artist
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                <Stack spacing={1}>
+                                    <Stack direction="row" spacing={1}>
+                                        <Chip
+                                            icon={<VerifiedIcon />}
+                                            label={`Claimed: ${stats.artists.claimed}`}
+                                            size="small"
+                                            sx={{ bgcolor: '#10B981', color: '#fff' }}
+                                        />
+                                        <Chip
+                                            label={`Unclaimed: ${stats.artists.unclaimed}`}
+                                            size="small"
+                                            sx={{ bgcolor: '#6B7280', color: '#fff' }}
+                                        />
+                                    </Stack>
+                                    {stats.artists.pendingClaims > 0 && (
+                                        <Chip
+                                            icon={<ClaimIcon />}
+                                            label={`${stats.artists.pendingClaims} Bekleyen Başvuru`}
+                                            size="small"
+                                            sx={{ bgcolor: '#FF9800', color: '#fff' }}
+                                        />
+                                    )}
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grow>
+                </Grid>
+
                 {/* Playlists */}
                 <Grid item xs={12} sm={6} md={3}>
                     <Grow in timeout={1200}>
@@ -413,11 +533,14 @@ const Dashboard = () => {
                             transition: 'all 0.3s',
                             bgcolor: '#fff',
                             border: '1px solid #e0e0e0',
+                            cursor: 'pointer',
                             '&:hover': {
                                 transform: 'translateY(-4px)',
                                 boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
                             }
-                        }}>
+                        }}
+                              onClick={() => navigate('/admin/playlists')}
+                        >
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                     <Avatar sx={{ bgcolor: '#424242', mr: 2, width: 56, height: 56 }}>
@@ -457,82 +580,22 @@ const Dashboard = () => {
                     </Grow>
                 </Grid>
 
-                {/* Platform Coverage */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Fade in timeout={1400}>
-                        <Card sx={{
-                            height: '100%',
-                            transition: 'all 0.3s',
-                            bgcolor: '#fff',
-                            border: '1px solid #e0e0e0',
-                            '&:hover': {
-                                transform: 'translateY(-4px)',
-                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
-                            }
-                        }}>
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#1DB954', mr: 2, width: 56, height: 56 }}>
-                                        <LinkIcon />
-                                    </Avatar>
-                                    <Box>
-                                        <Typography variant="h4" fontWeight="bold" color="#1DB954">
-                                            {getPlatformCoverage()}%
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Platform Kapsamı
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                                <Stack spacing={1}>
-                                    <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
-                                        <Tooltip title="Spotify">
-                                            <Chip
-                                                icon={<SpotifyIcon />}
-                                                label={stats.platformLinks.spotify}
-                                                size="small"
-                                                sx={{ bgcolor: platformConfig.spotify.bgColor, color: platformConfig.spotify.color }}
-                                            />
-                                        </Tooltip>
-                                        <Tooltip title="Apple Music">
-                                            <Chip
-                                                icon={<AppleIcon />}
-                                                label={stats.platformLinks.appleMusic}
-                                                size="small"
-                                                sx={{ bgcolor: platformConfig.appleMusic.bgColor, color: platformConfig.appleMusic.color }}
-                                            />
-                                        </Tooltip>
-                                        <Tooltip title="YouTube Music">
-                                            <Chip
-                                                icon={<YouTubeIcon />}
-                                                label={stats.platformLinks.youtubeMusic}
-                                                size="small"
-                                                sx={{ bgcolor: platformConfig.youtubeMusic.bgColor, color: platformConfig.youtubeMusic.color }}
-                                            />
-                                        </Tooltip>
-                                    </Stack>
-                                    <Typography variant="caption" color="text.secondary">
-                                        5 platform desteği aktif
-                                    </Typography>
-                                </Stack>
-                            </CardContent>
-                        </Card>
-                    </Fade>
-                </Grid>
-
                 {/* Users */}
                 <Grid item xs={12} sm={6} md={3}>
-                    <Grow in timeout={1600}>
+                    <Grow in timeout={1400}>
                         <Card sx={{
                             height: '100%',
                             transition: 'all 0.3s',
                             bgcolor: '#fff',
                             border: '1px solid #e0e0e0',
+                            cursor: 'pointer',
                             '&:hover': {
                                 transform: 'translateY(-4px)',
                                 boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
                             }
-                        }}>
+                        }}
+                              onClick={() => navigate('/admin/users')}
+                        >
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                     <Avatar sx={{ bgcolor: '#757575', mr: 2, width: 56, height: 56 }}>
@@ -573,7 +636,137 @@ const Dashboard = () => {
                 </Grid>
             </Grid>
 
-            {/* Platform Links Analytics (5 Platforms) */}
+            {/* Artist Stats Section - YENİ */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12}>
+                    <Fade in timeout={1500}>
+                        <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: '#7C3AED', mr: 2 }}>
+                                            <ArtistIcon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h6" fontWeight="bold">
+                                                Artist Yönetimi
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Sanatçı profilleri ve claim başvuruları
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<PersonAddIcon />}
+                                        onClick={() => navigate('/admin/artists')}
+                                        sx={{
+                                            bgcolor: '#7C3AED',
+                                            '&:hover': { bgcolor: '#6D28D9' }
+                                        }}
+                                    >
+                                        Artist Yönetimi
+                                    </Button>
+                                </Box>
+
+                                <Grid container spacing={3}>
+                                    {/* Total Artists */}
+                                    <Grid item xs={6} sm={3}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#F3F4F6', borderRadius: 2 }}>
+                                            <ArtistIcon sx={{ fontSize: 32, color: '#7C3AED', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#7C3AED">
+                                                {stats.artists.total}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Toplam Artist
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Claimed */}
+                                    <Grid item xs={6} sm={3}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#D1FAE5', borderRadius: 2 }}>
+                                            <VerifiedIcon sx={{ fontSize: 32, color: '#10B981', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#10B981">
+                                                {stats.artists.claimed}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Claimed (Sahiplenilmiş)
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Unclaimed */}
+                                    <Grid item xs={6} sm={3}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#F3F4F6', borderRadius: 2 }}>
+                                            <PersonIcon sx={{ fontSize: 32, color: '#6B7280', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#6B7280">
+                                                {stats.artists.unclaimed}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Unclaimed (Sahipsiz)
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Pending Claims */}
+                                    <Grid item xs={6} sm={3}>
+                                        <Box
+                                            sx={{
+                                                textAlign: 'center',
+                                                p: 2,
+                                                bgcolor: stats.artists.pendingClaims > 0 ? '#FEF3C7' : '#F3F4F6',
+                                                borderRadius: 2,
+                                                cursor: stats.artists.pendingClaims > 0 ? 'pointer' : 'default',
+                                                transition: 'all 0.2s',
+                                                '&:hover': stats.artists.pendingClaims > 0 ? {
+                                                    bgcolor: '#FDE68A',
+                                                    transform: 'scale(1.02)'
+                                                } : {}
+                                            }}
+                                            onClick={() => stats.artists.pendingClaims > 0 && navigate('/admin/artists?tab=claims')}
+                                        >
+                                            <ClaimIcon sx={{ fontSize: 32, color: stats.artists.pendingClaims > 0 ? '#F59E0B' : '#9CA3AF', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color={stats.artists.pendingClaims > 0 ? '#F59E0B' : '#9CA3AF'}>
+                                                {stats.artists.pendingClaims}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Bekleyen Başvuru
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+
+                                {/* Claim Rate Progress */}
+                                <Box sx={{ mt: 3 }}>
+                                    <Box display="flex" justifyContent="space-between" mb={1}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Claim Oranı
+                                        </Typography>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            %{getClaimRate()}
+                                        </Typography>
+                                    </Box>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={parseFloat(getClaimRate())}
+                                        sx={{
+                                            borderRadius: 2,
+                                            height: 10,
+                                            bgcolor: '#E5E7EB',
+                                            '& .MuiLinearProgress-bar': {
+                                                bgcolor: '#7C3AED'
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Fade>
+                </Grid>
+            </Grid>
+
+            {/* Platform Links Analytics */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12}>
                     <Fade in timeout={1800}>
@@ -724,7 +917,7 @@ const Dashboard = () => {
                                             </Box>
                                             <LinearProgress
                                                 variant="determinate"
-                                                value={(genre.count / stats.music.total) * 100}
+                                                value={stats.music.total > 0 ? (genre.count / stats.music.total) * 100 : 0}
                                                 sx={{
                                                     borderRadius: 2,
                                                     height: 8,
@@ -757,6 +950,7 @@ const Dashboard = () => {
                                         startIcon={<CloudUploadIcon />}
                                         fullWidth
                                         size="large"
+                                        onClick={() => navigate('/admin/music')}
                                         sx={{
                                             justifyContent: 'flex-start',
                                             bgcolor: '#000',
@@ -769,10 +963,28 @@ const Dashboard = () => {
                                         Yeni Müzik Ekle
                                     </Button>
                                     <Button
+                                        variant="contained"
+                                        startIcon={<PersonAddIcon />}
+                                        fullWidth
+                                        size="large"
+                                        onClick={() => navigate('/admin/artists')}
+                                        sx={{
+                                            justifyContent: 'flex-start',
+                                            bgcolor: '#7C3AED',
+                                            color: '#fff',
+                                            '&:hover': {
+                                                bgcolor: '#6D28D9'
+                                            }
+                                        }}
+                                    >
+                                        Yeni Artist Ekle
+                                    </Button>
+                                    <Button
                                         variant="outlined"
                                         startIcon={<PlaylistIcon />}
                                         fullWidth
                                         size="large"
+                                        onClick={() => navigate('/admin/playlists')}
                                         sx={{
                                             justifyContent: 'flex-start',
                                             borderColor: '#000',
@@ -785,28 +997,31 @@ const Dashboard = () => {
                                     >
                                         Admin Playlist Oluştur
                                     </Button>
+                                    {stats.artists.pendingClaims > 0 && (
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<ClaimIcon />}
+                                            fullWidth
+                                            size="large"
+                                            onClick={() => navigate('/admin/artists?tab=claims')}
+                                            sx={{
+                                                justifyContent: 'flex-start',
+                                                bgcolor: '#F59E0B',
+                                                color: '#fff',
+                                                '&:hover': {
+                                                    bgcolor: '#D97706'
+                                                }
+                                            }}
+                                        >
+                                            Claim Başvurularını İncele ({stats.artists.pendingClaims})
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="outlined"
-                                        startIcon={<LinkIcon />}
+                                        startIcon={<NotificationIcon />}
                                         fullWidth
                                         size="large"
-                                        sx={{
-                                            justifyContent: 'flex-start',
-                                            borderColor: '#1DB954',
-                                            color: '#1DB954',
-                                            '&:hover': {
-                                                borderColor: '#1DB954',
-                                                bgcolor: '#1DB95405'
-                                            }
-                                        }}
-                                    >
-                                        Platform Linki Ekle
-                                    </Button>
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<ImageIcon />}
-                                        fullWidth
-                                        size="large"
+                                        onClick={() => navigate('/admin/notifications')}
                                         sx={{
                                             justifyContent: 'flex-start',
                                             borderColor: '#616161',
@@ -817,7 +1032,7 @@ const Dashboard = () => {
                                             }
                                         }}
                                     >
-                                        Cover Image Yükle
+                                        Bildirim Gönder
                                     </Button>
                                 </Stack>
                             </CardContent>
@@ -826,9 +1041,10 @@ const Dashboard = () => {
                 </Grid>
             </Grid>
 
-            {/* Recent Activity & System Stats */}
+            {/* Recent Activity & Recent Artists */}
             <Grid container spacing={3}>
-                <Grid item xs={12} lg={8}>
+                {/* Recent Activity */}
+                <Grid item xs={12} lg={6}>
                     <Fade in timeout={2600}>
                         <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -855,11 +1071,10 @@ const Dashboard = () => {
                                 </Button>
                             </Box>
                             <TableContainer>
-                                <Table>
+                                <Table size="small">
                                     <TableHead>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 'bold' }}>Aktivite</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı</TableCell>
                                             <TableCell sx={{ fontWeight: 'bold' }}>Tip</TableCell>
                                             <TableCell sx={{ fontWeight: 'bold' }}>Zaman</TableCell>
                                         </TableRow>
@@ -868,7 +1083,6 @@ const Dashboard = () => {
                                         {recentActivity.map((activity) => (
                                             <TableRow key={activity.id} hover>
                                                 <TableCell>{activity.activity}</TableCell>
-                                                <TableCell>{activity.user}</TableCell>
                                                 <TableCell>
                                                     <Chip
                                                         label={activity.type}
@@ -876,8 +1090,8 @@ const Dashboard = () => {
                                                         sx={{
                                                             bgcolor: activity.type === 'music' ? '#000' :
                                                                 activity.type === 'playlist' ? '#424242' :
-                                                                    activity.type === 'platform' ? '#1DB954' :
-                                                                        activity.type === 'image' ? '#616161' : '#757575',
+                                                                    activity.type === 'artist' ? '#7C3AED' :
+                                                                        activity.type === 'claim' ? '#F59E0B' : '#757575',
                                                             color: '#fff'
                                                         }}
                                                     />
@@ -892,147 +1106,192 @@ const Dashboard = () => {
                     </Fade>
                 </Grid>
 
-                {/* System Health & Stats */}
-                <Grid item xs={12} lg={4}>
-                    <Stack spacing={3}>
-                        {/* System Health */}
-                        <Fade in timeout={2800}>
-                            <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
-                                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <SpeedIcon />
-                                    Sistem Durumu
+                {/* Recent Artists - YENİ */}
+                <Grid item xs={12} lg={6}>
+                    <Fade in timeout={2800}>
+                        <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <ArtistIcon />
+                                    Son Eklenen Artistler
                                 </Typography>
-                                <Stack spacing={2}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Çalışma Süresi
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {systemHealth.uptime}
-                                        </Typography>
-                                    </Box>
-                                    <Divider />
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Yanıt Süresi
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {systemHealth.responseTime}
-                                        </Typography>
-                                    </Box>
-                                    <Divider />
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Aktif Bağlantılar
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {systemHealth.activeConnections}
-                                        </Typography>
-                                    </Box>
-                                    <Divider />
-                                    <Chip
-                                        label={`Durum: ${systemHealth.status}`}
-                                        sx={{
-                                            alignSelf: 'flex-start',
-                                            fontWeight: 'bold',
-                                            bgcolor: '#000',
-                                            color: '#fff'
-                                        }}
-                                    />
-                                </Stack>
-                            </Paper>
-                        </Fade>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => navigate('/admin/artists')}
+                                    sx={{
+                                        borderColor: '#7C3AED',
+                                        color: '#7C3AED',
+                                        '&:hover': {
+                                            borderColor: '#7C3AED',
+                                            bgcolor: '#7C3AED10'
+                                        }
+                                    }}
+                                >
+                                    Tümünü Gör
+                                </Button>
+                            </Box>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Artist</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Takipçi</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {recentArtists.length > 0 ? recentArtists.map((artist) => (
+                                            <TableRow key={artist._id} hover>
+                                                <TableCell>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Avatar
+                                                            src={artist.profileImage}
+                                                            sx={{ width: 32, height: 32 }}
+                                                        >
+                                                            {artist.name?.charAt(0)}
+                                                        </Avatar>
+                                                        <Typography variant="body2">
+                                                            {artist.name}
+                                                        </Typography>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        icon={artist.claimStatus === 'claimed' ? <VerifiedIcon /> : undefined}
+                                                        label={artist.claimStatus === 'claimed' ? 'Claimed' :
+                                                            artist.claimStatus === 'pending' ? 'Pending' : 'Unclaimed'}
+                                                        size="small"
+                                                        sx={{
+                                                            bgcolor: artist.claimStatus === 'claimed' ? '#10B981' :
+                                                                artist.claimStatus === 'pending' ? '#F59E0B' : '#6B7280',
+                                                            color: '#fff'
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    {artist.followers?.length || 0}
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={3} align="center">
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Henüz artist eklenmemiş
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+                    </Fade>
+                </Grid>
+            </Grid>
 
-                        {/* Store Stats */}
-                        <Fade in timeout={3000}>
-                            <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
-                                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <StoreIcon />
-                                    Store İstatistikleri
-                                </Typography>
-                                <Stack spacing={2}>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="body2" color="text.secondary">
-                                            Toplam İlan
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {stats.store.totalListings}
-                                        </Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="body2" color="text.secondary">
-                                            Aktif İlan
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {stats.store.activeListings}
-                                        </Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="body2" color="text.secondary">
-                                            Gelir
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight="bold" color="#1DB954">
-                                            {stats.store.revenue.toLocaleString()} TL
-                                        </Typography>
-                                    </Box>
-                                </Stack>
-                            </Paper>
-                        </Fade>
-
-                        {/* Notification Stats */}
-                        <Fade in timeout={3200}>
-                            <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
-                                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <NotificationIcon />
-                                    Bildirimler
-                                </Typography>
-                                <Grid container spacing={2} sx={{ mb: 2 }}>
-                                    <Grid item xs={6}>
-                                        <Box sx={{ textAlign: 'center' }}>
-                                            <Typography variant="h5" fontWeight="bold">
-                                                {stats.notifications.sent}
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Gönderilen
-                                            </Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Box sx={{ textAlign: 'center' }}>
-                                            <Typography variant="h5" fontWeight="bold">
-                                                {stats.notifications.delivered}
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Teslim
-                                            </Typography>
-                                        </Box>
-                                    </Grid>
-                                </Grid>
-                                <Box>
-                                    <Box display="flex" justifyContent="space-between" mb={1}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Başarı Oranı
-                                        </Typography>
-                                        <Typography variant="body2" fontWeight="bold">
-                                            %{stats.notifications.deliveryRate}
-                                        </Typography>
-                                    </Box>
-                                    <LinearProgress
-                                        variant="determinate"
-                                        value={stats.notifications.deliveryRate}
-                                        sx={{
-                                            borderRadius: 2,
-                                            height: 8,
-                                            bgcolor: '#f5f5f5',
-                                            '& .MuiLinearProgress-bar': {
-                                                bgcolor: '#000'
-                                            }
-                                        }}
-                                    />
+            {/* System Stats Row */}
+            <Grid container spacing={3} sx={{ mt: 2 }}>
+                {/* System Health */}
+                <Grid item xs={12} md={4}>
+                    <Fade in timeout={3000}>
+                        <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <SpeedIcon />
+                                Sistem Durumu
+                            </Typography>
+                            <Stack spacing={2}>
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Çalışma Süresi</Typography>
+                                    <Typography variant="body1" fontWeight="bold">{systemHealth.uptime}</Typography>
                                 </Box>
-                            </Paper>
-                        </Fade>
-                    </Stack>
+                                <Divider />
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Yanıt Süresi</Typography>
+                                    <Typography variant="body1" fontWeight="bold">{systemHealth.responseTime}</Typography>
+                                </Box>
+                                <Divider />
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Aktif Bağlantılar</Typography>
+                                    <Typography variant="body1" fontWeight="bold">{systemHealth.activeConnections}</Typography>
+                                </Box>
+                                <Chip
+                                    label={`Durum: ${systemHealth.status}`}
+                                    sx={{ alignSelf: 'flex-start', fontWeight: 'bold', bgcolor: '#000', color: '#fff' }}
+                                />
+                            </Stack>
+                        </Paper>
+                    </Fade>
+                </Grid>
+
+                {/* Store Stats */}
+                <Grid item xs={12} md={4}>
+                    <Fade in timeout={3200}>
+                        <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <StoreIcon />
+                                Store İstatistikleri
+                            </Typography>
+                            <Stack spacing={2}>
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Toplam İlan</Typography>
+                                    <Typography variant="body1" fontWeight="bold">{stats.store.totalListings}</Typography>
+                                </Box>
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Aktif İlan</Typography>
+                                    <Typography variant="body1" fontWeight="bold">{stats.store.activeListings}</Typography>
+                                </Box>
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography variant="body2" color="text.secondary">Gelir</Typography>
+                                    <Typography variant="body1" fontWeight="bold" color="#1DB954">
+                                        {stats.store.revenue.toLocaleString()} TL
+                                    </Typography>
+                                </Box>
+                            </Stack>
+                        </Paper>
+                    </Fade>
+                </Grid>
+
+                {/* Notification Stats */}
+                <Grid item xs={12} md={4}>
+                    <Fade in timeout={3400}>
+                        <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <NotificationIcon />
+                                Bildirimler
+                            </Typography>
+                            <Grid container spacing={2} sx={{ mb: 2 }}>
+                                <Grid item xs={6}>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h5" fontWeight="bold">{stats.notifications.sent}</Typography>
+                                        <Typography variant="caption" color="text.secondary">Gönderilen</Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h5" fontWeight="bold">{stats.notifications.delivered}</Typography>
+                                        <Typography variant="caption" color="text.secondary">Teslim</Typography>
+                                    </Box>
+                                </Grid>
+                            </Grid>
+                            <Box>
+                                <Box display="flex" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2" color="text.secondary">Başarı Oranı</Typography>
+                                    <Typography variant="body2" fontWeight="bold">%{stats.notifications.deliveryRate}</Typography>
+                                </Box>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={stats.notifications.deliveryRate}
+                                    sx={{
+                                        borderRadius: 2,
+                                        height: 8,
+                                        bgcolor: '#f5f5f5',
+                                        '& .MuiLinearProgress-bar': { bgcolor: '#000' }
+                                    }}
+                                />
+                            </Box>
+                        </Paper>
+                    </Fade>
                 </Grid>
             </Grid>
         </Box>
