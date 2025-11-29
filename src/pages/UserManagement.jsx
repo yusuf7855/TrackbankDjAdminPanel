@@ -1,4 +1,5 @@
-// src/pages/UserManagement.jsx - KULLANICI YÖNETİMİ (ROZET ATAMA YOK)
+// src/pages/UserManagement.jsx - KULLANICI YÖNETİMİ (SADECE STANDART KULLANICILAR)
+// NOT: Trackbang rozetli artistler burada GÖRÜNMEYECEK - onlar ArtistManagement'ta
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
@@ -49,7 +50,6 @@ import {
     ExpandLess as ExpandLessIcon,
     Verified,
     WorkspacePremium,
-    Diamond,
     AdminPanelSettings as AdminIcon,
     ContentCopy as CopyIcon,
     Visibility as VisibilityIcon,
@@ -59,17 +59,17 @@ import {
     Key as KeyIcon,
     CheckCircle as CheckCircleIcon,
     Email as EmailIcon,
-    Phone as PhoneIcon
+    Phone as PhoneIcon,
+    Group as GroupIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
-// Badge Tanımları (sadece görüntüleme için)
+// Badge Tanımları (sadece görüntüleme için - trackbang hariç)
 const badges = {
     standard: { label: 'Standart', icon: Verified, color: '#2196f3' },
     premium: { label: 'Premium', icon: WorkspacePremium, color: '#ffc107' },
-    trackbang: { label: 'Trackbang', icon: Diamond, color: '#7C3AED' },
     none: { label: 'Rozet Yok', icon: null, color: '#9e9e9e' }
 };
 
@@ -136,14 +136,19 @@ const UserManagement = () => {
                 limit: rowsPerPage,
                 search: searchQuery || undefined,
                 role: roleFilter || undefined,
-                status: statusFilter || undefined
+                status: statusFilter || undefined,
+                excludeBadge: 'trackbang' // ⭐ Trackbang rozetli kullanıcıları hariç tut
             };
 
             const response = await axios.get(`${API_BASE_URL}/admin/users`, { params });
 
             if (response.data.success) {
-                setUsers(response.data.data.users || []);
-                setTotalUsers(response.data.data.pagination?.total || 0);
+                // Frontend'de de filtrele (backend desteklemezse)
+                const filteredUsers = (response.data.data.users || []).filter(
+                    user => user.badge !== 'trackbang'
+                );
+                setUsers(filteredUsers);
+                setTotalUsers(response.data.data.pagination?.total || filteredUsers.length);
             }
         } catch (error) {
             console.error('Users yüklenirken hata:', error);
@@ -301,6 +306,9 @@ const UserManagement = () => {
     };
 
     const renderBadgeChip = (badge) => {
+        // Trackbang rozetli kullanıcılar bu sayfada görünmemeli
+        if (badge === 'trackbang') return null;
+
         const badgeInfo = badges[badge] || badges.none;
         if (!badgeInfo.icon) return <Typography variant="caption" color="text.secondary">-</Typography>;
 
@@ -320,11 +328,12 @@ const UserManagement = () => {
             {/* Header */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <PersonIcon sx={{ color: '#7C3AED' }} />
+                    <GroupIcon sx={{ color: '#7C3AED' }} />
                     Kullanıcı Yönetimi
+                    <Chip label="Standart" size="small" sx={{ bgcolor: '#2196f3', color: '#fff', ml: 1 }} />
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Tüm kullanıcı hesaplarını görüntüleyin ve yönetin
+                    Normal kullanıcı hesaplarını görüntüleyin ve yönetin (Artistler hariç)
                 </Typography>
             </Box>
 
@@ -355,6 +364,13 @@ const UserManagement = () => {
                     </Card>
                 </Grid>
             </Grid>
+
+            {/* Info Alert */}
+            <Alert severity="info" sx={{ mb: 3 }}>
+                <Typography variant="body2">
+                    <strong>💎 Trackbang rozetli artistler</strong> bu listede görünmez. Onları yönetmek için <strong>Artist Yönetimi</strong> sayfasını kullanın.
+                </Typography>
+            </Alert>
 
             {/* Main Content */}
             <Paper sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
