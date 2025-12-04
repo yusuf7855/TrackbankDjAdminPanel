@@ -1,14 +1,11 @@
-// src/pages/ArtistManagement.jsx - ARTİST YÖNETİMİ (GÜNCELLENMİŞ CLAIM AKIŞI)
+// src/pages/ArtistManagement.jsx - ARTİST & KULLANICI YÖNETİMİ (TAM VERSİYON)
+// ⭐ DÜZELTME: API endpoint /api/admin/users/:id olarak güncellendi
 //
-// AKIŞ:
-// 1. Admin artist ekler → Placeholder user oluşur (geçici email/telefon)
-// 2. Artist "unclaimed" kalır
-// 3. Gerçek artist mobil app'ten kayıt olur
-// 4. Artist claim başvurusu yapar
-// 5. Admin başvuruyu görür:
-//    - Onaylarsa: Başvuran kullanıcı pasif edilir + Artist hesap bilgileri email ile gönderilir
-//    - Reddederse: Email ile bildirim gönderilir
-// 6. Artist, gelen email'deki bilgilerle giriş yapabilir
+// ÖZELLİKLER:
+// - Artist bilgileri yönetimi (isim, slug, bio, resimler, sosyal medya)
+// - Bağlı kullanıcı hesabı yönetimi (email, telefon, username, şifre, rozet)
+// - Claim başvuruları yönetimi
+// - Drag & drop resim yükleme (Base64)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -17,7 +14,8 @@ import {
     TableHead, TableRow, TablePagination, IconButton, Avatar, Chip, Dialog, DialogTitle,
     DialogContent, DialogActions, Grid, FormControl, InputLabel, Select, MenuItem, Alert,
     Snackbar, CircularProgress, Tabs, Tab, Tooltip, Stack, Divider, Card, CardContent,
-    InputAdornment, Badge, Collapse, CardMedia, Switch, FormControlLabel, LinearProgress
+    InputAdornment, Badge, Collapse, CardMedia, Switch, FormControlLabel, LinearProgress,
+    Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import {
     Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Search as SearchIcon,
@@ -30,7 +28,9 @@ import {
     AccountCircle as AccountIcon, ContentCopy as CopyIcon, Email as EmailIcon,
     Phone as PhoneIcon, SwapHoriz as SwapIcon, Info as InfoIcon, Lock as LockIcon,
     Visibility as VisibilityIcon, VisibilityOff as VisibilityOffIcon, Send as SendIcon,
-    PersonOff as PersonOffIcon, Key as KeyIcon
+    PersonOff as PersonOffIcon, Key as KeyIcon, ExpandMore as ExpandMoreIcon,
+    Badge as BadgeIcon, AlternateEmail as TagIcon, Security as SecurityIcon,
+    ManageAccounts as ManageAccountsIcon, Save as SaveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -44,8 +44,16 @@ function TabPanel({ children, value, index, ...other }) {
     );
 }
 
+// Badge seçenekleri
+const BADGE_OPTIONS = [
+    { value: 'none', label: 'Yok', color: '#6B7280' },
+    { value: 'trackbang', label: 'Trackbang', color: '#7C3AED' },
+    { value: 'premium', label: 'Premium', color: '#F59E0B' },
+    { value: 'standard', label: 'Standard', color: '#3B82F6' },
+    { value: 'verified', label: 'Verified', color: '#10B981' },
+];
+
 const DragDropImageUpload = ({ preview, isDragging, uploadProgress, onDragEnter, onDragLeave, onDragOver, onDrop, onFileSelect, onRemove, inputId, label, icon, height = 200 }) => {
-    // ⭐ Base64 veya URL olabilir - ikisi de çalışır
     const imageSource = preview || '';
 
     return (
@@ -60,7 +68,7 @@ const DragDropImageUpload = ({ preview, isDragging, uploadProgress, onDragEnter,
                 <>
                     <CardMedia
                         component="img"
-                        image={imageSource}  // ⭐ Base64 veya URL
+                        image={imageSource}
                         sx={{ maxHeight: height - 40, objectFit: 'contain', borderRadius: 1 }}
                         onError={(e) => {
                             console.error('Image preview error');
@@ -71,7 +79,6 @@ const DragDropImageUpload = ({ preview, isDragging, uploadProgress, onDragEnter,
                                 sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}>
                         <ClearIcon fontSize="small" />
                     </IconButton>
-                    {/* Base64 göstergesi */}
                     {preview.startsWith('data:image') && (
                         <Chip
                             label="Base64"
@@ -122,18 +129,34 @@ const ArtistManagement = () => {
     const [claimActionDialog, setClaimActionDialog] = useState({ open: false, claim: null, action: null });
     const [rejectionReason, setRejectionReason] = useState('');
 
-    // ⭐ YENİ: Claim onay için ek state'ler
+    // Claim approval states
     const [newPassword, setNewPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [approvalLoading, setApprovalLoading] = useState(false);
     const [approvalResult, setApprovalResult] = useState(null);
 
-    // Form data
+    // Form data - Artist bilgileri
     const [formData, setFormData] = useState({
         name: '', slug: '', bio: '', profileImage: '', bannerImage: '',
         socialLinks: { instagram: '', youtube: '', spotify: '', website: '' },
         createUserAccount: true, badge: 'trackbang', keepUnclaimed: true
     });
+
+    // ⭐ YENİ: Kullanıcı hesap bilgileri
+    const [userData, setUserData] = useState({
+        email: '',
+        phone: '',
+        username: '',
+        displayName: '',
+        firstName: '',
+        lastName: '',
+        password: '',
+        badge: 'trackbang',
+        isActive: true
+    });
+    const [showUserPassword, setShowUserPassword] = useState(false);
+    const [userDataExpanded, setUserDataExpanded] = useState(false);
+    const [savingUser, setSavingUser] = useState(false);
 
     // Drag states
     const [profileDragging, setProfileDragging] = useState(false);
@@ -204,6 +227,29 @@ const ArtistManagement = () => {
                 badge: 'trackbang',
                 keepUnclaimed: true
             });
+
+            // ⭐ Bağlı kullanıcı bilgilerini yükle
+            const linkedUser = artist.claimedBy || artist.placeholderUser;
+            if (linkedUser) {
+                setUserData({
+                    email: linkedUser.email || '',
+                    phone: linkedUser.phone || '',
+                    username: linkedUser.username || '',
+                    displayName: linkedUser.displayName || '',
+                    firstName: linkedUser.firstName || '',
+                    lastName: linkedUser.lastName || '',
+                    password: '', // Şifre boş - değiştirilmezse güncellenmez
+                    badge: linkedUser.badge || 'trackbang',
+                    isActive: linkedUser.isActive !== false
+                });
+                setUserDataExpanded(true);
+            } else {
+                setUserData({
+                    email: '', phone: '', username: '', displayName: '',
+                    firstName: '', lastName: '', password: '', badge: 'trackbang', isActive: true
+                });
+                setUserDataExpanded(false);
+            }
         } else {
             setDialogMode('add');
             setSelectedArtist(null);
@@ -212,6 +258,11 @@ const ArtistManagement = () => {
                 socialLinks: { instagram: '', youtube: '', spotify: '', website: '' },
                 createUserAccount: true, badge: 'trackbang', keepUnclaimed: true
             });
+            setUserData({
+                email: '', phone: '', username: '', displayName: '',
+                firstName: '', lastName: '', password: '', badge: 'trackbang', isActive: true
+            });
+            setUserDataExpanded(false);
         }
         setOpenDialog(true);
     };
@@ -220,6 +271,7 @@ const ArtistManagement = () => {
         setOpenDialog(false);
         setSelectedArtist(null);
         setUploadProgress(0);
+        setShowUserPassword(false);
     };
 
     // Form change
@@ -230,6 +282,11 @@ const ArtistManagement = () => {
         } else {
             setFormData(prev => ({ ...prev, [field]: value }));
         }
+    };
+
+    // ⭐ User data change
+    const handleUserDataChange = (field, value) => {
+        setUserData(prev => ({ ...prev, [field]: value }));
     };
 
     // Auto slug
@@ -243,17 +300,25 @@ const ArtistManagement = () => {
             .trim();
     };
 
-    // ⭐ BASE64 IMAGE UPLOAD - URL YOK, DİREKT BASE64
+    // Rastgele şifre oluştur
+    const generateRandomPassword = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+        let password = '';
+        for (let i = 0; i < 12; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+    };
+
+    // BASE64 IMAGE UPLOAD
     const handleImageUpload = async (file, type) => {
         try {
-            // Dosya boyutu kontrolü (5MB)
-            const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+            const MAX_FILE_SIZE = 5 * 1024 * 1024;
             if (file.size > MAX_FILE_SIZE) {
                 showSnackbar(`Dosya çok büyük! Maksimum 5MB. (${(file.size / 1024 / 1024).toFixed(2)}MB)`, 'error');
                 return;
             }
 
-            // Dosya tipi kontrolü
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             if (!allowedTypes.includes(file.type)) {
                 showSnackbar('Desteklenmeyen dosya formatı! (JPEG, PNG, GIF, WEBP)', 'error');
@@ -262,48 +327,28 @@ const ArtistManagement = () => {
 
             setUploadProgress(10);
 
-            // ⭐ BASE64'e çevir - Upload endpoint'i kullanmadan
             const reader = new FileReader();
-
-            reader.onloadstart = () => {
-                setUploadProgress(30);
-            };
-
+            reader.onloadstart = () => setUploadProgress(30);
             reader.onprogress = (event) => {
                 if (event.lengthComputable) {
                     const progress = Math.round((event.loaded * 100) / event.total);
                     setUploadProgress(Math.min(progress, 90));
                 }
             };
-
             reader.onload = () => {
-                const base64String = reader.result; // data:image/jpeg;base64,/9j/4AAQ...
-
-                // Base64 string boyut kontrolü
+                const base64String = reader.result;
                 const base64SizeKB = (base64String.length * 0.75) / 1024;
-                console.log(`🖼️ Base64 converted: ${type}, Size: ${base64SizeKB.toFixed(2)}KB`);
-
-                if (base64SizeKB > 5000) {
-                    console.warn(`⚠️ Large image: ${base64SizeKB.toFixed(2)}KB`);
-                }
-
                 handleFormChange(type, base64String);
                 setUploadProgress(100);
                 showSnackbar(`Görsel yüklendi (${base64SizeKB.toFixed(0)}KB)`);
-
                 setTimeout(() => setUploadProgress(0), 500);
             };
-
             reader.onerror = () => {
-                console.error('❌ File read error');
                 showSnackbar('Görsel okunamadı', 'error');
                 setUploadProgress(0);
             };
-
             reader.readAsDataURL(file);
-
         } catch (error) {
-            console.error('❌ Upload error:', error);
             showSnackbar('Görsel yüklenemedi', 'error');
             setUploadProgress(0);
         }
@@ -327,7 +372,7 @@ const ArtistManagement = () => {
         onRemove: () => handleFormChange(type, '')
     });
 
-    // Save artist
+    // ⭐ Save artist + user data
     const handleSaveArtist = async () => {
         if (!formData.name || !formData.slug) {
             showSnackbar('İsim ve slug zorunludur', 'error');
@@ -335,17 +380,74 @@ const ArtistManagement = () => {
         }
 
         try {
+            let artistId = selectedArtist?._id;
+
+            // Artist kaydet/güncelle
             if (dialogMode === 'add') {
-                await axios.post(`${API_BASE_URL}/artists`, formData, getAuthHeaders());
+                const response = await axios.post(`${API_BASE_URL}/artists`, formData, getAuthHeaders());
+                artistId = response.data.data?.artist?._id;
                 showSnackbar('Artist başarıyla eklendi');
             } else {
-                await axios.put(`${API_BASE_URL}/artists/${selectedArtist._id}`, formData, getAuthHeaders());
+                await axios.put(`${API_BASE_URL}/artists/${artistId}`, formData, getAuthHeaders());
                 showSnackbar('Artist başarıyla güncellendi');
             }
+
+            // ⭐ Kullanıcı bilgilerini güncelle (eğer düzenleme modundaysa ve bağlı kullanıcı varsa)
+            if (dialogMode === 'edit' && selectedArtist) {
+                const linkedUser = selectedArtist.claimedBy || selectedArtist.placeholderUser;
+                if (linkedUser && linkedUser._id) {
+                    await handleSaveUserData(linkedUser._id, false); // Dialog kapatma yok
+                }
+            }
+
             handleCloseDialog();
             loadArtists();
         } catch (error) {
             showSnackbar(error.response?.data?.message || 'İşlem başarısız', 'error');
+        }
+    };
+
+
+    const handleSaveUserData = async (userId, showMessage = true) => {
+        if (!userId) {
+            showSnackbar('Bağlı kullanıcı bulunamadı', 'error');
+            return;
+        }
+
+        setSavingUser(true);
+        try {
+            const updateData = {
+                email: userData.email,
+                phone: userData.phone,
+                username: userData.username,
+                displayName: userData.displayName,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                badge: userData.badge,
+                isActive: userData.isActive
+            };
+
+            // Şifre varsa ekle
+            if (userData.password && userData.password.length >= 6) {
+                updateData.password = userData.password;
+            }
+
+            // ⭐⭐⭐ DÜZELTME: Doğru endpoint kullanılıyor
+            // Eski: /api/users/:id/admin-update (YANLIŞ - bu route yok)
+            // Yeni: /api/admin/users/:id (DOĞRU - adminRoutes.js'de tanımlı)
+            await axios.put(`${API_BASE_URL}/admin/users/${userId}`, updateData, getAuthHeaders());
+
+            if (showMessage) {
+                showSnackbar('Kullanıcı bilgileri güncellendi');
+            }
+
+            // Şifreyi temizle
+            setUserData(prev => ({ ...prev, password: '' }));
+            loadArtists();
+        } catch (error) {
+            showSnackbar(error.response?.data?.message || 'Kullanıcı güncellenemedi', 'error');
+        } finally {
+            setSavingUser(false);
         }
     };
 
@@ -362,7 +464,7 @@ const ArtistManagement = () => {
         }
     };
 
-    // ⭐⭐⭐ CLAIM ACTION - GÜNCELLENMİŞ VERSİYON ⭐⭐⭐
+    // Claim action
     const handleClaimAction = async () => {
         const { claim, action } = claimActionDialog;
 
@@ -371,10 +473,9 @@ const ArtistManagement = () => {
             setApprovalResult(null);
 
             if (action === 'approve') {
-                // Onay isteği - Bilgiler otomatik aktarılacak
                 const requestData = {
                     grantBadge: 'trackbang',
-                    newPassword: newPassword || null  // Boşsa backend rastgele oluşturacak
+                    newPassword: newPassword || null
                 };
 
                 const response = await axios.put(
@@ -383,7 +484,6 @@ const ArtistManagement = () => {
                     getAuthHeaders()
                 );
 
-                // Sonucu göster
                 setApprovalResult({
                     success: true,
                     data: response.data.data,
@@ -391,9 +491,7 @@ const ArtistManagement = () => {
                 });
 
                 showSnackbar('Claim onaylandı ve email gönderildi!', 'success');
-
             } else {
-                // Red isteği
                 if (!rejectionReason.trim()) {
                     showSnackbar('Red sebebi zorunludur', 'error');
                     setApprovalLoading(false);
@@ -407,14 +505,11 @@ const ArtistManagement = () => {
                 );
 
                 showSnackbar('Claim reddedildi', 'success');
-
-                // Dialog'u kapat
                 handleCloseClaimDialog();
             }
 
             loadPendingClaims();
             loadArtists();
-
         } catch (error) {
             showSnackbar(error.response?.data?.message || 'Hata oluştu', 'error');
             setApprovalResult({
@@ -426,23 +521,12 @@ const ArtistManagement = () => {
         }
     };
 
-    // Dialog kapatma
     const handleCloseClaimDialog = () => {
         setClaimActionDialog({ open: false, claim: null, action: null });
         setRejectionReason('');
         setNewPassword('');
         setShowPassword(false);
         setApprovalResult(null);
-    };
-
-    // Rastgele şifre oluştur
-    const generateRandomPassword = () => {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-        let password = '';
-        for (let i = 0; i < 12; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        setNewPassword(password);
     };
 
     // Status chip
@@ -455,6 +539,19 @@ const ArtistManagement = () => {
             default:
                 return <Chip icon={<PersonIcon />} label="Unclaimed" size="small" sx={{ bgcolor: '#6B7280', color: '#fff' }} />;
         }
+    };
+
+    // Badge chip
+    const getBadgeChip = (badge) => {
+        const badgeInfo = BADGE_OPTIONS.find(b => b.value === badge) || BADGE_OPTIONS[0];
+        return (
+            <Chip
+                icon={<BadgeIcon />}
+                label={badgeInfo.label}
+                size="small"
+                sx={{ bgcolor: badgeInfo.color, color: '#fff' }}
+            />
+        );
     };
 
     // Filter
@@ -475,7 +572,7 @@ const ArtistManagement = () => {
                         <Chip label="Trackbang" size="small" sx={{ bgcolor: '#7C3AED', color: '#fff', ml: 1 }} />
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Sanatçı profillerini ve claim başvurularını yönetin
+                        Sanatçı profillerini, kullanıcı hesaplarını ve claim başvurularını yönetin
                     </Typography>
                 </Box>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}
@@ -487,12 +584,7 @@ const ArtistManagement = () => {
             {/* Info Alert */}
             <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
                 <Typography variant="body2">
-                    <strong>Claim Akışı:</strong> Artist eklediğinizde placeholder hesap oluşur ve <strong>unclaimed</strong> kalır.
-                    Gerçek artist mobil app'ten kayıt olup claim başvurusu yapar. Başvuruyu <strong>onayladığınızda</strong>:
-                    <br/>
-                    • Başvuran kullanıcı hesabı <strong>pasif</strong> edilir
-                    <br/>
-                    • Artist hesap bilgileri (kullanıcı adı + şifre) başvurandaki <strong>email adresine</strong> gönderilir
+                    <strong>Yeni Özellik:</strong> Artık artist düzenlerken bağlı kullanıcı hesabının <strong>email, telefon, username, şifre ve rozet</strong> bilgilerini de düzenleyebilirsiniz.
                 </Typography>
             </Alert>
 
@@ -561,70 +653,93 @@ const ArtistManagement = () => {
                                     <TableCell>Slug</TableCell>
                                     <TableCell>Claim Durumu</TableCell>
                                     <TableCell>Bağlı Hesap</TableCell>
+                                    <TableCell>Rozet</TableCell>
+                                    <TableCell>Email</TableCell>
                                     <TableCell align="right">İşlemler</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                             <CircularProgress />
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredArtists.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                             <Typography color="text.secondary">Artist bulunamadı</Typography>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     filteredArtists
                                         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                                        .map((artist) => (
-                                            <TableRow key={artist._id} hover>
-                                                <TableCell>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                        <Avatar src={artist.profileImage} sx={{ width: 48, height: 48 }}>
-                                                            <ArtistIcon />
-                                                        </Avatar>
-                                                        <Box>
-                                                            <Typography fontWeight="bold">{artist.name}</Typography>
-                                                            {artist.bio && (
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {artist.bio.substring(0, 50)}...
-                                                                </Typography>
-                                                            )}
+                                        .map((artist) => {
+                                            const linkedUser = artist.claimedBy || artist.placeholderUser;
+                                            return (
+                                                <TableRow key={artist._id} hover>
+                                                    <TableCell>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                            <Avatar src={artist.profileImage} sx={{ width: 48, height: 48 }}>
+                                                                <ArtistIcon />
+                                                            </Avatar>
+                                                            <Box>
+                                                                <Typography fontWeight="bold">{artist.name}</Typography>
+                                                                {artist.bio && (
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {artist.bio.substring(0, 50)}...
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
                                                         </Box>
-                                                    </Box>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Chip label={artist.slug} size="small" variant="outlined" />
-                                                </TableCell>
-                                                <TableCell>{getStatusChip(artist.claimStatus)}</TableCell>
-                                                <TableCell>
-                                                    {artist.claimedBy ? (
-                                                        <Tooltip title={artist.claimedBy.email || ''}>
-                                                            <Chip
-                                                                icon={<AccountIcon />}
-                                                                label={artist.claimedBy.username}
-                                                                size="small"
-                                                                variant="outlined"
-                                                            />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Chip label={artist.slug} size="small" variant="outlined" />
+                                                    </TableCell>
+                                                    <TableCell>{getStatusChip(artist.claimStatus)}</TableCell>
+                                                    <TableCell>
+                                                        {linkedUser ? (
+                                                            <Tooltip title={`ID: ${linkedUser._id}`}>
+                                                                <Chip
+                                                                    icon={<AccountIcon />}
+                                                                    label={`@${linkedUser.username}`}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    sx={{
+                                                                        borderColor: linkedUser.isActive === false ? '#EF4444' : '#10B981',
+                                                                        color: linkedUser.isActive === false ? '#EF4444' : 'inherit'
+                                                                    }}
+                                                                />
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <Typography variant="caption" color="text.secondary">-</Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {linkedUser ? getBadgeChip(linkedUser.badge) : '-'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {linkedUser?.email ? (
+                                                            <Typography variant="caption">{linkedUser.email}</Typography>
+                                                        ) : (
+                                                            <Typography variant="caption" color="text.secondary">-</Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <Tooltip title="Düzenle">
+                                                            <IconButton onClick={() => handleOpenDialog(artist)} color="primary">
+                                                                <EditIcon />
+                                                            </IconButton>
                                                         </Tooltip>
-                                                    ) : (
-                                                        <Typography variant="caption" color="text.secondary">-</Typography>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell align="right">
-                                                    <IconButton onClick={() => handleOpenDialog(artist)} color="primary">
-                                                        <EditIcon />
-                                                    </IconButton>
-                                                    <IconButton onClick={() => handleDeleteArtist(artist._id)} color="error">
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                                        <Tooltip title="Sil">
+                                                            <IconButton onClick={() => handleDeleteArtist(artist._id)} color="error">
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
                                 )}
                             </TableBody>
                         </Table>
@@ -698,25 +813,6 @@ const ArtistManagement = () => {
                                                 <Typography variant="body2">{claim.userId?.phone || 'Telefon yok'}</Typography>
                                             </Box>
                                         </Box>
-
-                                        {/* Placeholder User Info */}
-                                        {claim.placeholderUser && (
-                                            <Alert severity="info" sx={{ mb: 2 }}>
-                                                <Typography variant="body2">
-                                                    <strong>Artist Hesabı:</strong> @{claim.placeholderUser.username}
-                                                    <br/>
-                                                    <small>Onaylandığında bu hesabın bilgileri başvuranın emailine gönderilecek</small>
-                                                </Typography>
-                                            </Alert>
-                                        )}
-
-                                        {/* Doğrulama Bilgisi */}
-                                        {claim.notes && (
-                                            <Box sx={{ mb: 2 }}>
-                                                <Typography variant="subtitle2" color="text.secondary">Not:</Typography>
-                                                <Typography variant="body2">{claim.notes}</Typography>
-                                            </Box>
-                                        )}
 
                                         {/* Tarih */}
                                         <Typography variant="caption" color="text.secondary">
@@ -864,13 +960,232 @@ const ArtistManagement = () => {
                                         <InputLabel>Rozet</InputLabel>
                                         <Select value={formData.badge} label="Rozet"
                                                 onChange={(e) => handleFormChange('badge', e.target.value)}>
-                                            <MenuItem value="trackbang">Trackbang</MenuItem>
-                                            <MenuItem value="premium">Premium</MenuItem>
-                                            <MenuItem value="none">Yok</MenuItem>
+                                            {BADGE_OPTIONS.map(badge => (
+                                                <MenuItem key={badge.value} value={badge.value}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: badge.color }} />
+                                                        {badge.label}
+                                                    </Box>
+                                                </MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
                             </>
+                        )}
+
+                        {/* ⭐⭐⭐ BAĞLI KULLANICI HESABI YÖNETİMİ ⭐⭐⭐ */}
+                        {dialogMode === 'edit' && (selectedArtist?.claimedBy || selectedArtist?.placeholderUser) && (
+                            <Grid item xs={12}>
+                                <Accordion
+                                    expanded={userDataExpanded}
+                                    onChange={() => setUserDataExpanded(!userDataExpanded)}
+                                    sx={{ mt: 2, bgcolor: '#f8f9fa', border: '1px solid #e0e0e0' }}
+                                >
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <ManageAccountsIcon sx={{ color: '#7C3AED' }} />
+                                            <Box>
+                                                <Typography fontWeight="bold">
+                                                    Bağlı Kullanıcı Hesabı
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    @{userData.username} • {userData.email || 'Email yok'}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Alert severity="info" sx={{ mb: 3 }}>
+                                            <Typography variant="body2">
+                                                Bu bölümde artist'e bağlı kullanıcı hesabının bilgilerini düzenleyebilirsiniz.
+                                                Şifre alanını boş bırakırsanız mevcut şifre korunur.
+                                            </Typography>
+                                        </Alert>
+
+                                        <Grid container spacing={2}>
+                                            {/* Email */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Email"
+                                                    type="email"
+                                                    value={userData.email}
+                                                    onChange={(e) => handleUserDataChange('email', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><EmailIcon /></InputAdornment>
+                                                    }}
+                                                />
+                                            </Grid>
+
+                                            {/* Phone */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Telefon"
+                                                    value={userData.phone}
+                                                    onChange={(e) => handleUserDataChange('phone', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><PhoneIcon /></InputAdornment>
+                                                    }}
+                                                />
+                                            </Grid>
+
+                                            {/* Username */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Kullanıcı Adı (Tag)"
+                                                    value={userData.username}
+                                                    onChange={(e) => handleUserDataChange('username', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><TagIcon /></InputAdornment>
+                                                    }}
+                                                    helperText="@ ile başlayan tag"
+                                                />
+                                            </Grid>
+
+                                            {/* Display Name */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Görünen Ad"
+                                                    value={userData.displayName}
+                                                    onChange={(e) => handleUserDataChange('displayName', e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment>
+                                                    }}
+                                                />
+                                            </Grid>
+
+                                            {/* First Name */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Ad"
+                                                    value={userData.firstName}
+                                                    onChange={(e) => handleUserDataChange('firstName', e.target.value)}
+                                                />
+                                            </Grid>
+
+                                            {/* Last Name */}
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Soyad"
+                                                    value={userData.lastName}
+                                                    onChange={(e) => handleUserDataChange('lastName', e.target.value)}
+                                                />
+                                            </Grid>
+
+                                            {/* Badge */}
+                                            <Grid item xs={12} md={6}>
+                                                <FormControl fullWidth>
+                                                    <InputLabel>Rozet</InputLabel>
+                                                    <Select
+                                                        value={userData.badge}
+                                                        label="Rozet"
+                                                        onChange={(e) => handleUserDataChange('badge', e.target.value)}
+                                                        startAdornment={<InputAdornment position="start"><BadgeIcon /></InputAdornment>}
+                                                    >
+                                                        {BADGE_OPTIONS.map(badge => (
+                                                            <MenuItem key={badge.value} value={badge.value}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: badge.color }} />
+                                                                    {badge.label}
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+
+                                            {/* Is Active */}
+                                            <Grid item xs={12} md={6}>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Switch
+                                                            checked={userData.isActive}
+                                                            onChange={(e) => handleUserDataChange('isActive', e.target.checked)}
+                                                            color="success"
+                                                        />
+                                                    }
+                                                    label={userData.isActive ? "Hesap Aktif" : "Hesap Pasif"}
+                                                />
+                                            </Grid>
+
+                                            {/* Password */}
+                                            <Grid item xs={12}>
+                                                <Divider sx={{ my: 1 }} />
+                                                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <SecurityIcon fontSize="small" />
+                                                    Şifre Değiştir
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} md={8}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Yeni Şifre"
+                                                    type={showUserPassword ? 'text' : 'password'}
+                                                    value={userData.password}
+                                                    onChange={(e) => handleUserDataChange('password', e.target.value)}
+                                                    placeholder="Boş bırakılırsa mevcut şifre korunur"
+                                                    helperText="En az 6 karakter"
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><LockIcon /></InputAdornment>,
+                                                        endAdornment: (
+                                                            <InputAdornment position="end">
+                                                                <IconButton onClick={() => setShowUserPassword(!showUserPassword)}>
+                                                                    {showUserPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                                </IconButton>
+                                                            </InputAdornment>
+                                                        )
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={4}>
+                                                <Button
+                                                    fullWidth
+                                                    variant="outlined"
+                                                    startIcon={<RefreshIcon />}
+                                                    onClick={() => handleUserDataChange('password', generateRandomPassword())}
+                                                    sx={{ height: 56 }}
+                                                >
+                                                    Rastgele Şifre
+                                                </Button>
+                                            </Grid>
+
+                                            {/* Save User Button */}
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="contained"
+                                                    color="success"
+                                                    startIcon={savingUser ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                                                    onClick={() => {
+                                                        const linkedUser = selectedArtist.claimedBy || selectedArtist.placeholderUser;
+                                                        handleSaveUserData(linkedUser._id);
+                                                    }}
+                                                    disabled={savingUser}
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    {savingUser ? 'Kaydediliyor...' : 'Kullanıcı Bilgilerini Kaydet'}
+                                                </Button>
+                                            </Grid>
+                                        </Grid>
+                                    </AccordionDetails>
+                                </Accordion>
+                            </Grid>
+                        )}
+
+                        {/* No linked user message */}
+                        {dialogMode === 'edit' && !selectedArtist?.claimedBy && !selectedArtist?.placeholderUser && (
+                            <Grid item xs={12}>
+                                <Alert severity="warning" sx={{ mt: 2 }}>
+                                    <Typography variant="body2">
+                                        Bu artist'e bağlı kullanıcı hesabı bulunamadı.
+                                    </Typography>
+                                </Alert>
+                            </Grid>
                         )}
                     </Grid>
                 </DialogContent>
@@ -878,12 +1193,12 @@ const ArtistManagement = () => {
                     <Button onClick={handleCloseDialog}>İptal</Button>
                     <Button variant="contained" onClick={handleSaveArtist}
                             sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}>
-                        {dialogMode === 'add' ? 'Ekle' : 'Güncelle'}
+                        {dialogMode === 'add' ? 'Ekle' : 'Artist Bilgilerini Güncelle'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* ========== ⭐ CLAIM ACTION DIALOG - GÜNCELLENMİŞ ⭐ ========== */}
+            {/* ========== CLAIM ACTION DIALOG ========== */}
             <Dialog
                 open={claimActionDialog.open}
                 onClose={handleCloseClaimDialog}
@@ -929,12 +1244,8 @@ const ArtistManagement = () => {
 
                             {claimActionDialog.action === 'approve' ? (
                                 <>
-                                    {/* Onay Sonucu Gösterimi */}
                                     {approvalResult && (
-                                        <Alert
-                                            severity={approvalResult.success ? 'success' : 'error'}
-                                            sx={{ mb: 3 }}
-                                        >
+                                        <Alert severity={approvalResult.success ? 'success' : 'error'} sx={{ mb: 3 }}>
                                             {approvalResult.success ? (
                                                 <>
                                                     <Typography variant="body2" fontWeight="bold">
@@ -946,42 +1257,16 @@ const ArtistManagement = () => {
                                                         • Bilgiler artist hesabına aktarıldı
                                                         <br/>
                                                         • Email {approvalResult.data?.emailSent ? 'gönderildi ✅' : 'gönderilemedi ❌'}
-                                                        <br/>
-                                                        • Artist hesabı: @{approvalResult.data?.artistCredentials?.username}
                                                     </Typography>
                                                 </>
                                             ) : (
-                                                <Typography variant="body2">
-                                                    ❌ Hata: {approvalResult.error}
-                                                </Typography>
+                                                <Typography variant="body2">❌ Hata: {approvalResult.error}</Typography>
                                             )}
                                         </Alert>
                                     )}
 
                                     {!approvalResult && (
                                         <>
-                                            {/* ⭐ OTOMATİK AKTARIM BİLGİSİ */}
-                                            <Alert severity="success" sx={{ mb: 3 }} icon={<SwapIcon />}>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    Otomatik Bilgi Aktarımı
-                                                </Typography>
-                                                <Typography variant="body2">
-                                                    Onaylandığında başvuran kullanıcının bilgileri artist hesabına <strong>otomatik aktarılacak</strong>:
-                                                </Typography>
-                                                <Box sx={{ mt: 1, pl: 2 }}>
-                                                    <Typography variant="body2">
-                                                        • <strong>Email:</strong> {claimActionDialog.claim?.userId?.email || 'Yok'}
-                                                    </Typography>
-                                                    <Typography variant="body2">
-                                                        • <strong>Telefon:</strong> {claimActionDialog.claim?.userId?.phone || 'Yok'}
-                                                    </Typography>
-                                                    <Typography variant="body2">
-                                                        • <strong>İsim:</strong> {claimActionDialog.claim?.userId?.firstName || 'Yok'} {claimActionDialog.claim?.userId?.lastName || ''}
-                                                    </Typography>
-                                                </Box>
-                                            </Alert>
-
-                                            {/* Şifre Ayarlama */}
                                             <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
                                                 <KeyIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
                                                 Artist Hesap Şifresi
@@ -999,25 +1284,17 @@ const ArtistManagement = () => {
                                                             <IconButton onClick={() => setShowPassword(!showPassword)}>
                                                                 {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                                                             </IconButton>
-                                                            <IconButton onClick={generateRandomPassword} title="Rastgele şifre oluştur">
+                                                            <IconButton onClick={() => setNewPassword(generateRandomPassword())} title="Rastgele şifre">
                                                                 <RefreshIcon />
                                                             </IconButton>
                                                         </InputAdornment>
                                                     )
                                                 }}
                                             />
-
-                                            {/* Bilgi Notu */}
-                                            <Alert severity="info" sx={{ mt: 2 }}>
-                                                <Typography variant="caption">
-                                                    💡 Onaylandığında şifre ve kullanıcı adı, başvuranın email adresine ({claimActionDialog.claim?.userId?.email}) gönderilecek.
-                                                </Typography>
-                                            </Alert>
                                         </>
                                     )}
                                 </>
                             ) : (
-                                // Red formu
                                 <TextField
                                     fullWidth
                                     multiline

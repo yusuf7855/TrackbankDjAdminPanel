@@ -1,4 +1,4 @@
-// Playlists.jsx - INPUT FOCUS SORUNU DÜZELTİLMİŞ
+// Playlists.jsx - MUSICS IS NOT ITERABLE HATASI DÜZELTİLMİŞ
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
     Box,
@@ -70,8 +70,9 @@ const TabPanel = memo(({ children, value, index }) => (
 ));
 
 export const Playlists = () => {
+    // ✅ State tanımlamaları - musics için boş array başlangıç değeri
     const [playlists, setPlaylists] = useState([]);
-    const [musics, setMusics] = useState([]);
+    const [musics, setMusics] = useState([]); // ✅ Başlangıç değeri boş array
     const [filteredMusics, setFilteredMusics] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
@@ -105,26 +106,56 @@ export const Playlists = () => {
         { value: 'melodichouse', label: 'Melodic House', color: '#9c27b0', icon: '🎹' }
     ], []);
 
-    // Fetch fonksiyonları
+    // ✅ Fetch fonksiyonları - DÜZELTİLMİŞ
     const fetchPlaylists = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/playlists/admin`);
-            setPlaylists(response.data.playlists || []);
+            // Response yapısını kontrol et
+            const playlistData = response.data?.playlists || response.data?.data?.playlists || [];
+            setPlaylists(Array.isArray(playlistData) ? playlistData : []);
         } catch (error) {
             console.error('Error fetching playlists:', error);
             setError('Admin playlist\'leri yüklenirken hata oluştu');
+            setPlaylists([]); // ✅ Hata durumunda boş array
         } finally {
             setLoading(false);
         }
     }, []);
 
+    // ✅ fetchMusics - HATA DÜZELTİLDİ
     const fetchMusics = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/music`);
-            setMusics(response.data.music || response.data || []);
+
+            // ✅ Response yapısını doğru şekilde parse et
+            // Backend: { success: true, data: { musics: [...], pagination: {...} } }
+            // veya: { success: true, musics: [...] }
+            let musicData = [];
+
+            if (response.data?.data?.musics) {
+                // Yeni format: response.data.data.musics
+                musicData = response.data.data.musics;
+            } else if (response.data?.musics) {
+                // Alternatif format: response.data.musics
+                musicData = response.data.musics;
+            } else if (response.data?.music) {
+                // Eski format: response.data.music
+                musicData = response.data.music;
+            } else if (Array.isArray(response.data?.data)) {
+                // response.data.data array ise
+                musicData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                // response.data direkt array ise
+                musicData = response.data;
+            }
+
+            // ✅ Her zaman array olduğundan emin ol
+            setMusics(Array.isArray(musicData) ? musicData : []);
+
         } catch (error) {
             console.error('Error fetching musics:', error);
             setError('Müzik kütüphanesi yüklenirken hata oluştu');
+            setMusics([]); // ✅ Hata durumunda boş array set et
         }
     }, []);
 
@@ -133,18 +164,26 @@ export const Playlists = () => {
         fetchMusics();
     }, [fetchPlaylists, fetchMusics]);
 
-    // Filter musics
+    // ✅ Filter musics - GÜVENLİ SPREAD OPERATÖRÜ
     useEffect(() => {
-        let filtered = [...musics];
+        // ✅ musics'in array olduğundan emin ol
+        if (!Array.isArray(musics)) {
+            setFilteredMusics([]);
+            return;
+        }
+
+        let filtered = [...musics]; // ✅ Artık güvenli
 
         if (selectedMusicCategory !== 'all') {
-            filtered = filtered.filter(music => music.genre === selectedMusicCategory);
+            filtered = filtered.filter(music => music?.genre === selectedMusicCategory);
         }
 
         if (musicSearchTerm) {
+            const searchLower = musicSearchTerm.toLowerCase();
             filtered = filtered.filter(music =>
-                music.title.toLowerCase().includes(musicSearchTerm.toLowerCase()) ||
-                music.artist.toLowerCase().includes(musicSearchTerm.toLowerCase())
+                music?.title?.toLowerCase().includes(searchLower) ||
+                music?.artist?.toLowerCase().includes(searchLower) ||
+                music?.artistNames?.toLowerCase().includes(searchLower)
             );
         }
 
@@ -227,6 +266,7 @@ export const Playlists = () => {
         }
     };
 
+    // ✅ handleEdit - GÜVENLİ MUSİCS ERİŞİMİ
     const handleEdit = (playlist) => {
         setEditingPlaylist(playlist);
         setPlaylistName(playlist.name || '');
@@ -235,7 +275,13 @@ export const Playlists = () => {
         setPlaylistSubCategory(playlist.subCategory || '');
         setCoverImage(playlist.coverImage || '');
         setCoverImagePreview(playlist.coverImage || null);
-        setSelectedMusics(playlist.musics?.map(m => m._id) || []);
+
+        // ✅ Güvenli musics erişimi
+        const musicIds = Array.isArray(playlist.musics)
+            ? playlist.musics.map(m => m?._id || m).filter(Boolean)
+            : [];
+        setSelectedMusics(musicIds);
+
         setOpenDialog(true);
     };
 
@@ -254,13 +300,14 @@ export const Playlists = () => {
 
     const handleMusicToggle = (musicId) => {
         setSelectedMusics(prev => {
-            const newSelection = prev.includes(musicId)
-                ? prev.filter(id => id !== musicId)
-                : [...prev, musicId];
+            const prevArray = Array.isArray(prev) ? prev : [];
+            const newSelection = prevArray.includes(musicId)
+                ? prevArray.filter(id => id !== musicId)
+                : [...prevArray, musicId];
 
             if (newSelection.length > 10) {
                 setError('Maksimum 10 müzik seçebilirsiniz');
-                return prev;
+                return prevArray;
             }
 
             setError(null);
@@ -292,15 +339,34 @@ export const Playlists = () => {
         };
     };
 
-    // Filtered playlists
+    // ✅ Filtered playlists - GÜVENLİ FİLTRELEME
     const filteredPlaylists = useMemo(() => {
+        if (!Array.isArray(playlists)) return [];
+
         return playlists.filter(playlist => {
+            if (!playlist) return false;
             const matchesCategory = filterCategory === 'all' || playlist.genre === filterCategory;
-            const matchesSearch = playlist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            const matchesSearch =
+                playlist.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 playlist.subCategory?.toLowerCase().includes(searchTerm.toLowerCase());
             return matchesCategory && matchesSearch;
         });
     }, [playlists, filterCategory, searchTerm]);
+
+    // Auto-clear messages
+    useEffect(() => {
+        if (success) {
+            const timer = setTimeout(() => setSuccess(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [success]);
+
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
 
     if (loading) {
         return (
@@ -316,617 +382,456 @@ export const Playlists = () => {
     return (
         <Box sx={{ p: 3 }}>
             {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-                <Box display="flex" alignItems="center">
-                    <Avatar sx={{ bgcolor: '#9c27b0', mr: 2, width: 56, height: 56 }}>
-                        <PlaylistAddIcon />
-                    </Avatar>
-                    <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                            Admin Genre Playlist'leri
-                        </Typography>
-                        <Typography variant="subtitle1" color="text.secondary">
-                            Cover image'li genre playlist'leri yönetin
-                        </Typography>
-                    </Box>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Box>
+                    <Typography variant="h4" fontWeight="bold">
+                        🎵 Admin Playlist Yönetimi
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                        {filteredPlaylists.length} playlist • {musics.length} müzik mevcut
+                    </Typography>
                 </Box>
                 <Button
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => setOpenDialog(true)}
                     sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        '&:hover': {
-                            background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                        },
-                        borderRadius: 2,
-                        px: 3,
-                        py: 1.5
+                        background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+                        boxShadow: '0 3px 15px rgba(102, 126, 234, 0.3)',
                     }}
                 >
                     Yeni Admin Playlist
                 </Button>
             </Box>
 
-            {/* Info Card */}
-            <Paper
-                elevation={0}
-                sx={{
-                    mb: 3,
-                    p: 3,
-                    background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
-                    border: '1px solid',
-                    borderColor: 'divider'
-                }}
-            >
-                <Stack direction="row" spacing={2} alignItems="center">
-                    <CategoryIcon sx={{ fontSize: 40, color: '#9c27b0' }} />
-                    <Box>
-                        <Typography variant="h6" fontWeight="bold" gutterBottom>
-                            ℹ️ Genre & Cover Image Sistemi
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            • <strong>Cover Images:</strong> Her playlist için özel cover image yükleyebilirsiniz<br/>
-                            • <strong>Genre System:</strong> 5 ana genre: Afro House, Indie Dance, Organic House, Down Tempo, Melodic House<br/>
-                            • <strong>HOT System:</strong> Her genre'den en son eklenen admin playlist HOT olarak görünür<br/>
-                            • <strong>Alt Kategori:</strong> Format: AH1, MH1, ID1 (İki harf + sayı)
-                        </Typography>
-                    </Box>
-                </Stack>
-            </Paper>
-
             {/* Alerts */}
-            <Stack spacing={2} mb={3}>
-                {error && (
-                    <Fade in>
-                        <Alert severity="error" onClose={() => setError(null)}>
-                            {error}
-                        </Alert>
-                    </Fade>
-                )}
-                {success && (
-                    <Fade in>
-                        <Alert severity="success" onClose={() => setSuccess(null)}>
-                            {success}
-                        </Alert>
-                    </Fade>
-                )}
-            </Stack>
+            {success && (
+                <Fade in>
+                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+                        {success}
+                    </Alert>
+                </Fade>
+            )}
+            {error && (
+                <Fade in>
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                        {error}
+                    </Alert>
+                </Fade>
+            )}
 
             {/* Filters */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} sm={6} md={4}>
-                            <TextField
-                                fullWidth
-                                size="small"
-                                placeholder="Playlist veya alt kategori ara..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                InputProps={{
-                                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel>Tür Filtresi</InputLabel>
-                                <Select
-                                    value={filterCategory}
-                                    label="Tür Filtresi"
-                                    onChange={(e) => setFilterCategory(e.target.value)}
-                                >
-                                    {genres.map(genre => (
-                                        <MenuItem key={genre.value} value={genre.value}>
-                                            <Box display="flex" alignItems="center">
-                                                <Typography sx={{ mr: 1 }}>{genre.icon}</Typography>
-                                                <Box
-                                                    sx={{
-                                                        width: 12,
-                                                        height: 12,
-                                                        borderRadius: '50%',
-                                                        bgcolor: genre.color,
-                                                        mr: 1
-                                                    }}
-                                                />
-                                                {genre.label}
-                                            </Box>
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={12} md={4}>
-                            <Stack direction="row" spacing={2}>
-                                <Chip
-                                    icon={<PlaylistAddIcon />}
-                                    label={`${filteredPlaylists.length} playlist`}
-                                    color="primary"
-                                    variant="outlined"
-                                />
-                                <Chip
-                                    icon={<ImageIcon />}
-                                    label={`${filteredPlaylists.filter(p => p.coverImage).length} cover'lı`}
-                                    color="success"
-                                    variant="outlined"
-                                />
-                            </Stack>
-                        </Grid>
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            fullWidth
+                            placeholder="Playlist ara..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                            }}
+                            size="small"
+                        />
                     </Grid>
-                </CardContent>
-            </Card>
+                    <Grid item xs={12} md={6}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Kategori</InputLabel>
+                            <Select
+                                value={filterCategory}
+                                label="Kategori"
+                                onChange={(e) => setFilterCategory(e.target.value)}
+                            >
+                                {genres.map(genre => (
+                                    <MenuItem key={genre.value} value={genre.value}>
+                                        <Box display="flex" alignItems="center" gap={1}>
+                                            <span>{genre.icon}</span>
+                                            <span>{genre.label}</span>
+                                        </Box>
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                </Grid>
+            </Paper>
 
-            {/* Playlists Table */}
+            {/* Playlist Table */}
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
-                        <TableRow>
-                            <TableCell width="80">Cover</TableCell>
-                            <TableCell>Playlist Bilgileri</TableCell>
-                            <TableCell>Tür & Alt Kategori</TableCell>
-                            <TableCell>Stats</TableCell>
-                            <TableCell>Tarih</TableCell>
-                            <TableCell width="120">İşlemler</TableCell>
+                        <TableRow sx={{ backgroundColor: 'grey.100' }}>
+                            <TableCell>Cover</TableCell>
+                            <TableCell>Playlist</TableCell>
+                            <TableCell>Kategori</TableCell>
+                            <TableCell>Alt Kategori</TableCell>
+                            <TableCell align="center">Müzik</TableCell>
+                            <TableCell align="center">Beğeni</TableCell>
+                            <TableCell align="center">İzlenme</TableCell>
+                            <TableCell align="right">İşlemler</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {filteredPlaylists.map((playlist) => {
-                            const genreData = getGenreData(playlist.genre);
-                            return (
-                                <TableRow key={playlist._id} hover>
-                                    <TableCell>
-                                        {playlist.coverImage ? (
+                        {filteredPlaylists.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                                    <Typography color="text.secondary">
+                                        {searchTerm || filterCategory !== 'all'
+                                            ? 'Arama kriterlerine uygun playlist bulunamadı'
+                                            : 'Henüz admin playlist oluşturulmamış'}
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filteredPlaylists.map((playlist) => {
+                                const genreData = getGenreData(playlist.genre);
+                                const musicCount = Array.isArray(playlist.musics)
+                                    ? playlist.musics.length
+                                    : (playlist.musicCount || 0);
+
+                                return (
+                                    <TableRow key={playlist._id} hover>
+                                        <TableCell>
                                             <Avatar
                                                 src={playlist.coverImage}
                                                 variant="rounded"
-                                                sx={{ width: 60, height: 60 }}
-                                            />
-                                        ) : (
-                                            <Avatar
-                                                variant="rounded"
-                                                sx={{
-                                                    width: 60,
-                                                    height: 60,
-                                                    bgcolor: genreData.color
-                                                }}
+                                                sx={{ width: 56, height: 56 }}
                                             >
                                                 <MusicIcon />
                                             </Avatar>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="subtitle2" fontWeight="bold">
-                                            {playlist.name}
-                                        </Typography>
-                                        {playlist.description && (
-                                            <Typography
-                                                variant="body2"
-                                                color="text.secondary"
-                                                sx={{
-                                                    display: '-webkit-box',
-                                                    WebkitLineClamp: 2,
-                                                    WebkitBoxOrient: 'vertical',
-                                                    overflow: 'hidden'
-                                                }}
-                                            >
-                                                {playlist.description}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography fontWeight="medium">
+                                                {playlist.name}
                                             </Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack spacing={1}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {playlist.description?.substring(0, 50)}
+                                                {playlist.description?.length > 50 ? '...' : ''}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
                                             <Chip
-                                                label={
-                                                    <Box display="flex" alignItems="center" gap={0.5}>
-                                                        <span>{genreData.icon}</span>
-                                                        <span>{genreData.label}</span>
-                                                    </Box>
-                                                }
+                                                label={`${genreData.icon} ${genreData.label}`}
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: genreData.color,
-                                                    color: 'white',
-                                                    fontWeight: 'bold'
+                                                    backgroundColor: genreData.color,
+                                                    color: 'white'
                                                 }}
                                             />
+                                        </TableCell>
+                                        <TableCell>
                                             <Chip
                                                 label={playlist.subCategory}
                                                 size="small"
                                                 variant="outlined"
-                                                sx={{
-                                                    borderColor: genreData.color,
-                                                    color: genreData.color,
-                                                    fontWeight: 'bold'
-                                                }}
                                             />
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack spacing={0.5}>
+                                        </TableCell>
+                                        <TableCell align="center">
                                             <Chip
                                                 icon={<MusicIcon />}
-                                                label={`${playlist.musicCount || 0} şarkı`}
+                                                label={musicCount}
                                                 size="small"
+                                                color="primary"
                                                 variant="outlined"
                                             />
-                                            <Stack direction="row" spacing={1}>
-                                                <Chip
-                                                    icon={<ViewsIcon />}
-                                                    label={playlist.views || 0}
-                                                    size="small"
-                                                    variant="outlined"
-                                                    color="primary"
-                                                />
-                                                <Chip
-                                                    icon={<FavoriteIcon />}
-                                                    label={playlist.likes || 0}
-                                                    size="small"
-                                                    variant="outlined"
-                                                    color="error"
-                                                />
-                                            </Stack>
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {new Date(playlist.createdAt).toLocaleDateString('tr-TR', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric'
-                                            })}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack direction="row" spacing={1}>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                                                <FavoriteIcon fontSize="small" color="error" />
+                                                <Typography variant="body2">{playlist.likes || 0}</Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                                                <ViewsIcon fontSize="small" color="action" />
+                                                <Typography variant="body2">{playlist.views || 0}</Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="right">
                                             <Tooltip title="Düzenle">
-                                                <IconButton onClick={() => handleEdit(playlist)} color="primary" size="small">
+                                                <IconButton
+                                                    color="primary"
+                                                    onClick={() => handleEdit(playlist)}
+                                                >
                                                     <EditIcon />
                                                 </IconButton>
                                             </Tooltip>
                                             <Tooltip title="Sil">
-                                                <IconButton onClick={() => handleDelete(playlist._id)} color="error" size="small">
+                                                <IconButton
+                                                    color="error"
+                                                    onClick={() => handleDelete(playlist._id)}
+                                                >
                                                     <DeleteIcon />
                                                 </IconButton>
                                             </Tooltip>
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
+                        )}
                     </TableBody>
                 </Table>
             </TableContainer>
-
-            {filteredPlaylists.length === 0 && (
-                <Paper sx={{ textAlign: 'center', py: 8, mt: 3 }}>
-                    <PlaylistAddIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
-                        Admin Playlist Bulunamadı
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" mb={3}>
-                        {searchTerm || filterCategory !== 'all'
-                            ? 'Arama kriterlerinize uygun playlist bulunamadı'
-                            : 'Yeni bir admin playlist oluşturmak için yukarıdaki butonu kullanın'}
-                    </Typography>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setOpenDialog(true)}
-                    >
-                        İlk Admin Playlist'inizi Oluşturun
-                    </Button>
-                </Paper>
-            )}
 
             {/* Create/Edit Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={resetForm}
-                maxWidth="lg"
+                maxWidth="md"
                 fullWidth
+                PaperProps={{
+                    sx: { borderRadius: 2 }
+                }}
             >
-                <DialogTitle sx={{ pb: 1 }}>
-                    <Box display="flex" alignItems="center">
-                        <PlaylistAddIcon sx={{ mr: 1, color: '#9c27b0' }} />
-                        {editingPlaylist ? 'Admin Playlist Düzenle' : 'Yeni Admin Playlist Oluştur'}
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <PlaylistAddIcon color="primary" />
+                        {editingPlaylist ? 'Admin Playlist Düzenle' : 'Yeni Admin Playlist'}
                     </Box>
                 </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-                            <Tab icon={<CategoryIcon />} iconPosition="start" label="Bilgiler" />
-                            <Tab icon={<ImageIcon />} iconPosition="start" label="Cover Image" />
-                            <Tab icon={<MusicIcon />} iconPosition="start" label={`Müzikler (${selectedMusics.length}/10)`} />
-                        </Tabs>
-                    </Box>
 
-                    {/* Tab 0: Playlist Info */}
+                <DialogContent dividers>
+                    <Tabs
+                        value={tabValue}
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        sx={{ mb: 2 }}
+                    >
+                        <Tab label="Temel Bilgiler" />
+                        <Tab label={`Müzik Seç (${selectedMusics.length}/10)`} />
+                    </Tabs>
+
                     <TabPanel value={tabValue} index={0}>
                         <Grid container spacing={3}>
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    fullWidth
-                                    label="Playlist Adı"
-                                    value={playlistName}
-                                    onChange={(e) => setPlaylistName(e.target.value)}
-                                    required
-                                    placeholder="Örn: Afro House Essentials"
-                                    autoComplete="off"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <TextField
-                                    fullWidth
-                                    label="Alt Kategori"
-                                    value={playlistSubCategory}
-                                    onChange={(e) => setPlaylistSubCategory(e.target.value.toUpperCase())}
-                                    placeholder="AH1, MH1..."
-                                    required
-                                    helperText="Format: İki harf + sayı"
-                                    autoComplete="off"
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Tür</InputLabel>
-                                    <Select
-                                        value={playlistGenre}
-                                        label="Tür"
-                                        onChange={(e) => setPlaylistGenre(e.target.value)}
+                            <Grid item xs={12} md={8}>
+                                <Stack spacing={2}>
+                                    <TextField
+                                        label="Playlist Adı"
+                                        value={playlistName}
+                                        onChange={(e) => setPlaylistName(e.target.value)}
+                                        fullWidth
                                         required
-                                    >
-                                        {genres.filter(g => g.value !== 'all').map(genre => (
-                                            <MenuItem key={genre.value} value={genre.value}>
-                                                <Box display="flex" alignItems="center">
-                                                    <Typography sx={{ mr: 1 }}>{genre.icon}</Typography>
-                                                    <Box
-                                                        sx={{
-                                                            width: 12,
-                                                            height: 12,
-                                                            borderRadius: '50%',
-                                                            bgcolor: genre.color,
-                                                            mr: 1
-                                                        }}
-                                                    />
-                                                    {genre.label}
-                                                </Box>
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Açıklama"
-                                    value={playlistDescription}
-                                    onChange={(e) => setPlaylistDescription(e.target.value)}
-                                    multiline
-                                    rows={3}
-                                    placeholder="Bu playlist hakkında kısa bir açıklama..."
-                                    autoComplete="off"
-                                />
-                            </Grid>
-                        </Grid>
-                    </TabPanel>
-
-                    {/* Tab 1: Cover Image */}
-                    <TabPanel value={tabValue} index={1}>
-                        <Stack spacing={3}>
-                            <Box
-                                sx={{
-                                    border: '2px dashed',
-                                    borderColor: 'grey.300',
-                                    borderRadius: 2,
-                                    p: 3,
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        borderColor: 'primary.main',
-                                        bgcolor: 'grey.50'
-                                    }
-                                }}
-                                onClick={() => document.getElementById('cover-image-upload').click()}
-                            >
-                                <input
-                                    id="cover-image-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    style={{ display: 'none' }}
-                                />
-                                {coverImagePreview ? (
-                                    <Box>
-                                        <CardMedia
-                                            component="img"
-                                            image={coverImagePreview}
-                                            alt="Preview"
-                                            sx={{
-                                                width: '100%',
-                                                maxHeight: 400,
-                                                objectFit: 'cover',
-                                                borderRadius: 2,
-                                                mb: 2
-                                            }}
-                                        />
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<UploadIcon />}
-                                            size="small"
-                                        >
-                                            Değiştir
-                                        </Button>
-                                    </Box>
-                                ) : (
-                                    <Box>
-                                        <UploadIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                                        <Typography variant="h6" gutterBottom>
-                                            Cover Image Yükle
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Tıklayarak bir görsel seçin (Önerilen: 1:1 oran)
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
-
-                            <Divider>VEYA</Divider>
-
-                            <TextField
-                                fullWidth
-                                label="Cover Image URL"
-                                value={coverImage}
-                                onChange={(e) => {
-                                    setCoverImage(e.target.value);
-                                    setCoverImagePreview(e.target.value);
-                                }}
-                                placeholder="https://example.com/cover.jpg"
-                                helperText="Harici bir cover image linki girebilirsiniz"
-                                autoComplete="off"
-                            />
-                        </Stack>
-                    </TabPanel>
-
-                    {/* Tab 2: Music Selection */}
-                    <TabPanel value={tabValue} index={2}>
-                        <Grid container spacing={2} mb={3}>
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    placeholder="Müzik ara..."
-                                    value={musicSearchTerm}
-                                    onChange={(e) => setMusicSearchTerm(e.target.value)}
-                                    InputProps={{
-                                        startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                    }}
-                                    autoComplete="off"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Tür</InputLabel>
-                                    <Select
-                                        value={selectedMusicCategory}
-                                        label="Tür"
-                                        onChange={(e) => setSelectedMusicCategory(e.target.value)}
-                                    >
-                                        {genres.map(genre => (
-                                            <MenuItem key={genre.value} value={genre.value}>
-                                                <Box display="flex" alignItems="center">
-                                                    <Typography sx={{ mr: 1 }}>{genre.icon}</Typography>
-                                                    {genre.label}
-                                                </Box>
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            Maksimum 10 müzik seçebilirsiniz. Seçilen: {selectedMusics.length}/10
-                        </Alert>
-
-                        <List sx={{ maxHeight: 450, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                            {filteredMusics.map(music => (
-                                <ListItem key={music._id} divider>
-                                    <ListItemIcon>
-                                        <Checkbox
-                                            checked={selectedMusics.includes(music._id)}
-                                            onChange={() => handleMusicToggle(music._id)}
-                                            color="primary"
-                                            disabled={!selectedMusics.includes(music._id) && selectedMusics.length >= 10}
-                                        />
-                                    </ListItemIcon>
-                                    {music.imageUrl && (
-                                        <ListItemAvatar>
-                                            <Avatar
-                                                src={music.imageUrl}
-                                                variant="rounded"
-                                                sx={{ width: 50, height: 50 }}
-                                            />
-                                        </ListItemAvatar>
-                                    )}
-                                    <ListItemText
-                                        primary={
-                                            <Typography variant="subtitle2" fontWeight="bold">
-                                                {music.title}
-                                            </Typography>
-                                        }
-                                        secondary={
-                                            <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
-                                                <Typography variant="body2" component="span">
-                                                    {music.artist}
-                                                </Typography>
-                                                <Chip
-                                                    label={getGenreData(music.genre).label}
-                                                    size="small"
-                                                    sx={{
-                                                        bgcolor: getGenreData(music.genre).color,
-                                                        color: 'white',
-                                                        fontSize: '0.7rem'
-                                                    }}
-                                                />
-                                            </Stack>
-                                        }
                                     />
-                                    <Stack direction="row" spacing={0.5}>
-                                        {music.platformLinks?.appleMusic && (
-                                            <Tooltip title="Apple Music">
-                                                <IconButton size="small">
-                                                    <AppleIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                        {music.platformLinks?.youtubeMusic && (
-                                            <Tooltip title="YouTube Music">
-                                                <IconButton size="small">
-                                                    <YouTubeIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                    </Stack>
-                                </ListItem>
-                            ))}
-                        </List>
+                                    <TextField
+                                        label="Açıklama"
+                                        value={playlistDescription}
+                                        onChange={(e) => setPlaylistDescription(e.target.value)}
+                                        fullWidth
+                                        multiline
+                                        rows={3}
+                                    />
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={6}>
+                                            <FormControl fullWidth required>
+                                                <InputLabel>Kategori</InputLabel>
+                                                <Select
+                                                    value={playlistGenre}
+                                                    label="Kategori"
+                                                    onChange={(e) => setPlaylistGenre(e.target.value)}
+                                                >
+                                                    {genres.filter(g => g.value !== 'all').map(genre => (
+                                                        <MenuItem key={genre.value} value={genre.value}>
+                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                                <span>{genre.icon}</span>
+                                                                <span>{genre.label}</span>
+                                                            </Box>
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="Alt Kategori Kodu"
+                                                value={playlistSubCategory}
+                                                onChange={(e) => setPlaylistSubCategory(e.target.value.toUpperCase())}
+                                                fullWidth
+                                                required
+                                                placeholder="AH1, MH2, ID3..."
+                                                helperText="Format: 2 harf + sayı (örn: AH1)"
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Stack>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <Box
+                                    sx={{
+                                        border: '2px dashed',
+                                        borderColor: 'grey.300',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        '&:hover': { borderColor: 'primary.main' }
+                                    }}
+                                    component="label"
+                                >
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                    />
+                                    {coverImagePreview ? (
+                                        <Box>
+                                            <img
+                                                src={coverImagePreview}
+                                                alt="Cover"
+                                                style={{
+                                                    width: '100%',
+                                                    height: 150,
+                                                    objectFit: 'cover',
+                                                    borderRadius: 8
+                                                }}
+                                            />
+                                            <Typography variant="caption" color="text.secondary" mt={1}>
+                                                Değiştirmek için tıklayın
+                                            </Typography>
+                                        </Box>
+                                    ) : (
+                                        <Box py={4}>
+                                            <UploadIcon sx={{ fontSize: 48, color: 'grey.400' }} />
+                                            <Typography variant="body2" color="text.secondary" mt={1}>
+                                                Kapak Resmi Yükle
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </TabPanel>
 
-                        {filteredMusics.length === 0 && (
-                            <Box textAlign="center" py={4}>
-                                <SearchIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
-                                <Typography variant="body1" color="text.secondary" mt={2}>
-                                    Arama kriterlerinize uygun müzik bulunamadı
-                                </Typography>
-                            </Box>
+                    <TabPanel value={tabValue} index={1}>
+                        <Box mb={2}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} md={8}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        placeholder="Müzik ara..."
+                                        value={musicSearchTerm}
+                                        onChange={(e) => setMusicSearchTerm(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Kategori</InputLabel>
+                                        <Select
+                                            value={selectedMusicCategory}
+                                            label="Kategori"
+                                            onChange={(e) => setSelectedMusicCategory(e.target.value)}
+                                        >
+                                            {genres.map(genre => (
+                                                <MenuItem key={genre.value} value={genre.value}>
+                                                    {genre.icon} {genre.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            </Grid>
+                        </Box>
+
+                        {selectedMusics.length > 0 && (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                {selectedMusics.length} müzik seçildi (Maksimum 10)
+                            </Alert>
                         )}
+
+                        <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                            {filteredMusics.length === 0 ? (
+                                <ListItem>
+                                    <ListItemText
+                                        primary="Müzik bulunamadı"
+                                        secondary={musics.length === 0
+                                            ? "Müzik kütüphanesi yüklenemedi"
+                                            : "Arama kriterlerinizi değiştirin"}
+                                    />
+                                </ListItem>
+                            ) : (
+                                filteredMusics.map((music) => {
+                                    const isSelected = selectedMusics.includes(music._id);
+                                    const genreData = getGenreData(music.genre);
+
+                                    return (
+                                        <ListItem
+                                            key={music._id}
+                                            button
+                                            onClick={() => handleMusicToggle(music._id)}
+                                            sx={{
+                                                borderRadius: 1,
+                                                mb: 0.5,
+                                                backgroundColor: isSelected ? 'action.selected' : 'transparent'
+                                            }}
+                                        >
+                                            <ListItemIcon>
+                                                <Checkbox checked={isSelected} />
+                                            </ListItemIcon>
+                                            <ListItemAvatar>
+                                                <Avatar
+                                                    src={music.imageUrl}
+                                                    variant="rounded"
+                                                >
+                                                    <MusicIcon />
+                                                </Avatar>
+                                            </ListItemAvatar>
+                                            <ListItemText
+                                                primary={music.title}
+                                                secondary={
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Typography variant="caption">
+                                                            {music.artist || music.artistNames}
+                                                        </Typography>
+                                                        <Chip
+                                                            label={genreData.label}
+                                                            size="small"
+                                                            sx={{
+                                                                height: 18,
+                                                                fontSize: 10,
+                                                                backgroundColor: genreData.color,
+                                                                color: 'white'
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                }
+                                            />
+                                            <Box display="flex" gap={1}>
+                                                <Chip
+                                                    icon={<FavoriteIcon sx={{ fontSize: 12 }} />}
+                                                    label={music.likes || 0}
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                                <Chip
+                                                    icon={<ViewsIcon sx={{ fontSize: 12 }} />}
+                                                    label={music.views || 0}
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            </Box>
+                                        </ListItem>
+                                    );
+                                })
+                            )}
+                        </List>
                     </TabPanel>
                 </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 3 }}>
-                    <Button onClick={resetForm} color="inherit" disabled={submitLoading}>
+
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={resetForm} disabled={submitLoading}>
                         İptal
                     </Button>
-                    {tabValue < 2 && (
-                        <Button
-                            onClick={() => setTabValue(tabValue + 1)}
-                            variant="outlined"
-                        >
-                            Sonraki
-                        </Button>
-                    )}
                     <Button
-                        onClick={handleSubmit}
                         variant="contained"
-                        disabled={selectedMusics.length === 0 || submitLoading}
-                        startIcon={submitLoading ? <CircularProgress size={20} /> : null}
-                        sx={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            '&:hover': {
-                                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                            }
-                        }}
+                        onClick={handleSubmit}
+                        disabled={submitLoading}
+                        startIcon={submitLoading ? <CircularProgress size={20} /> : <AddIcon />}
                     >
-                        {submitLoading ? 'İşleniyor...' : (editingPlaylist ? 'Güncelle' : 'Oluştur')}
+                        {editingPlaylist ? 'Güncelle' : 'Oluştur'}
                     </Button>
                 </DialogActions>
             </Dialog>
