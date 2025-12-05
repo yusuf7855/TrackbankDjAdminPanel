@@ -36,7 +36,8 @@ import {
     MusicNote,
     Group,
     PlayCircle,
-    MicExternalOn as ArtistIcon
+    MicExternalOn as ArtistIcon,
+    PlaylistAddCheck as ApprovalIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -66,6 +67,15 @@ const menuItems = [
         badge: null,
         badgeColor: 'warning',
         dynamicBadge: true // Pending claims sayısını gösterecek
+    },
+    {
+        id: 'artist-essential',
+        title: 'Artist Essential',
+        icon: <ApprovalIcon />,
+        path: '/admin/artist-essential',
+        description: 'Playlist Onay',
+        badge: 'NEW',
+        badgeColor: 'warning'
     },
     {
         id: 'playlists',
@@ -341,7 +351,7 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                                 height: 16,
                                                 fontSize: '0.6rem',
                                                 fontWeight: 700,
-                                                backgroundColor: '#000',
+                                                backgroundColor: item.badgeColor === 'warning' ? '#ff9800' : '#000',
                                                 color: '#fff',
                                                 '& .MuiChip-label': {
                                                     px: 0.7

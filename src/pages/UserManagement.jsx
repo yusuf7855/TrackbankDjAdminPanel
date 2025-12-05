@@ -60,7 +60,8 @@ import {
     CheckCircle as CheckCircleIcon,
     Email as EmailIcon,
     Phone as PhoneIcon,
-    Group as GroupIcon
+    Group as GroupIcon,
+    Badge as BadgeIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -105,7 +106,8 @@ const UserManagement = () => {
         phone: '',
         bio: '',
         isAdmin: false,
-        isActive: true
+        isActive: true,
+        badge: 'none'
     });
 
     // Snackbar state
@@ -137,13 +139,12 @@ const UserManagement = () => {
                 search: searchQuery || undefined,
                 role: roleFilter || undefined,
                 status: statusFilter || undefined,
-                excludeBadge: 'trackbang' // ⭐ Trackbang rozetli kullanıcıları hariç tut
+                excludeBadge: 'trackbang'
             };
 
             const response = await axios.get(`${API_BASE_URL}/admin/users`, { params });
 
             if (response.data.success) {
-                // Frontend'de de filtrele (backend desteklemezse)
                 const filteredUsers = (response.data.data.users || []).filter(
                     user => user.badge !== 'trackbang'
                 );
@@ -190,7 +191,8 @@ const UserManagement = () => {
             phone: user.phone || '',
             bio: user.bio || '',
             isAdmin: user.isAdmin || false,
-            isActive: user.isActive !== false
+            isActive: user.isActive !== false,
+            badge: user.badge || 'none'
         });
         setEditDialog({ open: true, user });
     };
@@ -306,7 +308,6 @@ const UserManagement = () => {
     };
 
     const renderBadgeChip = (badge) => {
-        // Trackbang rozetli kullanıcılar bu sayfada görünmemeli
         if (badge === 'trackbang') return null;
 
         const badgeInfo = badges[badge] || badges.none;
@@ -722,41 +723,147 @@ const UserManagement = () => {
                 <DialogContent sx={{ mt: 2 }}>
                     <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Ad" value={editFormData.firstName} onChange={(e) => handleEditFormChange('firstName', e.target.value)} />
+                            <TextField
+                                fullWidth
+                                label="Ad"
+                                value={editFormData.firstName}
+                                onChange={(e) => handleEditFormChange('firstName', e.target.value)}
+                            />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Soyad" value={editFormData.lastName} onChange={(e) => handleEditFormChange('lastName', e.target.value)} />
+                            <TextField
+                                fullWidth
+                                label="Soyad"
+                                value={editFormData.lastName}
+                                onChange={(e) => handleEditFormChange('lastName', e.target.value)}
+                            />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Kullanıcı Adı" value={editFormData.username} onChange={(e) => handleEditFormChange('username', e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">@</InputAdornment> }} />
+                            <TextField
+                                fullWidth
+                                label="Kullanıcı Adı"
+                                value={editFormData.username}
+                                onChange={(e) => handleEditFormChange('username', e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">@</InputAdornment>
+                                }}
+                            />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Email" value={editFormData.email} onChange={(e) => handleEditFormChange('email', e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><EmailIcon /></InputAdornment> }} />
+                            <TextField
+                                fullWidth
+                                label="Email"
+                                value={editFormData.email}
+                                onChange={(e) => handleEditFormChange('email', e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start"><EmailIcon /></InputAdornment>
+                                }}
+                            />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Telefon" value={editFormData.phone} onChange={(e) => handleEditFormChange('phone', e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><PhoneIcon /></InputAdornment> }} />
+                            <TextField
+                                fullWidth
+                                label="Telefon"
+                                value={editFormData.phone}
+                                onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start"><PhoneIcon /></InputAdornment>
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Rozet</InputLabel>
+                                <Select
+                                    value={editFormData.badge}
+                                    label="Rozet"
+                                    onChange={(e) => handleEditFormChange('badge', e.target.value)}
+                                >
+                                    <MenuItem value="none">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <BadgeIcon sx={{ color: '#9e9e9e' }} />
+                                            <Typography>Rozet Yok</Typography>
+                                        </Box>
+                                    </MenuItem>
+                                    <MenuItem value="standard">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Verified sx={{ color: '#2196f3' }} />
+                                            <Typography>Standart</Typography>
+                                        </Box>
+                                    </MenuItem>
+                                    <MenuItem value="premium">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <WorkspacePremium sx={{ color: '#ffc107' }} />
+                                            <Typography>Premium</Typography>
+                                        </Box>
+                                    </MenuItem>
+                                    <MenuItem value="trackbang">
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Verified sx={{ color: '#9C27B0' }} />
+                                            <Typography>Trackbang Artist</Typography>
+                                        </Box>
+                                    </MenuItem>
+                                </Select>
+                            </FormControl>
                         </Grid>
                         <Grid item xs={12}>
-                            <TextField fullWidth label="Bio" value={editFormData.bio} onChange={(e) => handleEditFormChange('bio', e.target.value)} multiline rows={2} />
+                            <TextField
+                                fullWidth
+                                label="Bio"
+                                value={editFormData.bio}
+                                onChange={(e) => handleEditFormChange('bio', e.target.value)}
+                                multiline
+                                rows={2}
+                            />
                         </Grid>
-                        <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 1 }} />
+                        </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControlLabel
-                                control={<Switch checked={editFormData.isAdmin} onChange={(e) => handleEditFormChange('isAdmin', e.target.checked)} color="error" />}
-                                label={<Box><Typography variant="body2" fontWeight="bold">Admin Yetkisi</Typography><Typography variant="caption" color="text.secondary">Admin paneline erişim izni</Typography></Box>}
+                                control={
+                                    <Switch
+                                        checked={editFormData.isAdmin}
+                                        onChange={(e) => handleEditFormChange('isAdmin', e.target.checked)}
+                                        color="error"
+                                    />
+                                }
+                                label={
+                                    <Box>
+                                        <Typography variant="body2" fontWeight="bold">Admin Yetkisi</Typography>
+                                        <Typography variant="caption" color="text.secondary">Admin paneline erişim izni</Typography>
+                                    </Box>
+                                }
                             />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <FormControlLabel
-                                control={<Switch checked={editFormData.isActive} onChange={(e) => handleEditFormChange('isActive', e.target.checked)} color="success" />}
-                                label={<Box><Typography variant="body2" fontWeight="bold">Aktif Hesap</Typography><Typography variant="caption" color="text.secondary">Hesap giriş yapabilir</Typography></Box>}
+                                control={
+                                    <Switch
+                                        checked={editFormData.isActive}
+                                        onChange={(e) => handleEditFormChange('isActive', e.target.checked)}
+                                        color="success"
+                                    />
+                                }
+                                label={
+                                    <Box>
+                                        <Typography variant="body2" fontWeight="bold">Aktif Hesap</Typography>
+                                        <Typography variant="caption" color="text.secondary">Hesap giriş yapabilir</Typography>
+                                    </Box>
+                                }
                             />
                         </Grid>
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ p: 2, bgcolor: '#f5f5f5' }}>
                     <Button onClick={handleCloseEditDialog} color="inherit">İptal</Button>
-                    <Button variant="contained" onClick={handleSaveUser} sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}>Kaydet</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveUser}
+                        sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}
+                    >
+                        Kaydet
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -778,8 +885,19 @@ const UserManagement = () => {
             </Dialog>
 
             {/* Snackbar */}
-            <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-                <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} variant="filled">{snackbar.message}</Alert>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    severity={snackbar.severity}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
             </Snackbar>
         </Box>
     );
