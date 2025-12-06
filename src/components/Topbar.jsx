@@ -58,6 +58,9 @@ const Topbar = ({ onMenuClick }) => {
             '/admin/store': 'Mağaza Yönetimi',
             '/admin/notifications': 'Bildirimler',
             '/admin/users': 'Kullanıcı Yönetimi',
+            '/admin/artists': 'Artist Yönetimi',
+            '/admin/artist-essential': 'Artist Essential',
+            '/admin/genres': 'Genre Yönetimi',  // ✅ YENİ
             '/admin/analytics': 'Analytics',
             '/admin/settings': 'Ayarlar'
         };

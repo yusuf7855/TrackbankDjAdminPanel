@@ -1,4 +1,6 @@
-// Playlists.jsx - MUSICS IS NOT ITERABLE HATASI DÜZELTİLMİŞ
+// Playlists.jsx - DYNAMIC GENRES FROM BACKEND
+// ✅ Genres artık backend'den çekiliyor
+// ✅ musics is not iterable hatası düzeltilmiş
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
     Box,
@@ -40,7 +42,8 @@ import {
     Avatar,
     Fade,
     Divider,
-    Tooltip
+    Tooltip,
+    Skeleton
 } from '@mui/material';
 import {
     Delete as DeleteIcon,
@@ -56,11 +59,21 @@ import {
     Visibility as ViewsIcon,
     Favorite as FavoriteIcon,
     Apple as AppleIcon,
-    YouTube as YouTubeIcon
+    YouTube as YouTubeIcon,
+    Refresh as RefreshIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5000/api';
+
+// Fallback genres (API başarısız olursa)
+const FALLBACK_GENRES = [
+    { slug: 'afrohouse', displayName: 'Afro House', color: '#ff9800' },
+    { slug: 'indiedance', displayName: 'Indie Dance', color: '#e91e63' },
+    { slug: 'organichouse', displayName: 'Organic House', color: '#8bc34a' },
+    { slug: 'downtempo', displayName: 'Down Tempo', color: '#2196f3' },
+    { slug: 'melodichouse', displayName: 'Melodic House', color: '#9c27b0' }
+];
 
 // TabPanel'i memo ile wrap et
 const TabPanel = memo(({ children, value, index }) => (
@@ -70,9 +83,9 @@ const TabPanel = memo(({ children, value, index }) => (
 ));
 
 export const Playlists = () => {
-    // ✅ State tanımlamaları - musics için boş array başlangıç değeri
+    // ✅ State tanımlamaları
     const [playlists, setPlaylists] = useState([]);
-    const [musics, setMusics] = useState([]); // ✅ Başlangıç değeri boş array
+    const [musics, setMusics] = useState([]);
     const [filteredMusics, setFilteredMusics] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
@@ -87,95 +100,135 @@ export const Playlists = () => {
     const [tabValue, setTabValue] = useState(0);
     const [submitLoading, setSubmitLoading] = useState(false);
 
+    // ✅ YENİ: Dynamic genres state
+    const [genres, setGenres] = useState([]);
+    const [genresLoading, setGenresLoading] = useState(true);
+
     // Form state
     const [playlistName, setPlaylistName] = useState('');
     const [playlistDescription, setPlaylistDescription] = useState('');
-    const [playlistGenre, setPlaylistGenre] = useState('afrohouse');
+    const [playlistGenre, setPlaylistGenre] = useState('');
     const [playlistSubCategory, setPlaylistSubCategory] = useState('');
     const [coverImage, setCoverImage] = useState('');
     const [coverImagePreview, setCoverImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState(null);
 
-    // Genre listesi - useMemo kullan
-    const genres = useMemo(() => [
-        { value: 'all', label: 'Tüm Türler', color: '#4caf50', icon: '🎵' },
-        { value: 'afrohouse', label: 'Afro House', color: '#ff9800', icon: '🌍' },
-        { value: 'indiedance', label: 'Indie Dance', color: '#e91e63', icon: '💃' },
-        { value: 'organichouse', label: 'Organic House', color: '#8bc34a', icon: '🌿' },
-        { value: 'downtempo', label: 'Down Tempo', color: '#2196f3', icon: '🎧' },
-        { value: 'melodichouse', label: 'Melodic House', color: '#9c27b0', icon: '🎹' }
-    ], []);
+    // ✅ YENİ: Genres with "all" option for filters
+    const genresWithAll = useMemo(() => {
+        return [
+            { slug: 'all', displayName: 'Tüm Türler', color: '#4caf50' },
+            ...genres
+        ];
+    }, [genres]);
 
-    // ✅ Fetch fonksiyonları - DÜZELTİLMİŞ
+    // ✅ YENİ: Fetch genres from backend
+    const fetchGenres = useCallback(async () => {
+        setGenresLoading(true);
+        try {
+            const response = await axios.get(`${API_BASE_URL}/genres`);
+
+            let genreData = [];
+            if (response.data?.data && Array.isArray(response.data.data)) {
+                genreData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                genreData = response.data;
+            }
+
+            // Sadece aktif genre'leri al ve order'a göre sırala
+            const activeGenres = genreData
+                .filter(g => g.isActive !== false)
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            if (activeGenres.length > 0) {
+                setGenres(activeGenres);
+                // İlk genre'yi default olarak seç (eğer henüz seçilmemişse)
+                if (!playlistGenre) {
+                    setPlaylistGenre(activeGenres[0].slug);
+                }
+            } else {
+                // API boş döndüyse fallback kullan
+                setGenres(FALLBACK_GENRES);
+                if (!playlistGenre) {
+                    setPlaylistGenre(FALLBACK_GENRES[0].slug);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching genres:', error);
+            // API hatası durumunda fallback kullan
+            setGenres(FALLBACK_GENRES);
+            if (!playlistGenre) {
+                setPlaylistGenre(FALLBACK_GENRES[0].slug);
+            }
+        } finally {
+            setGenresLoading(false);
+        }
+    }, [playlistGenre]);
+
+    // ✅ Fetch fonksiyonları
     const fetchPlaylists = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/playlists/admin`);
-            // Response yapısını kontrol et
             const playlistData = response.data?.playlists || response.data?.data?.playlists || [];
             setPlaylists(Array.isArray(playlistData) ? playlistData : []);
         } catch (error) {
             console.error('Error fetching playlists:', error);
             setError('Admin playlist\'leri yüklenirken hata oluştu');
-            setPlaylists([]); // ✅ Hata durumunda boş array
+            setPlaylists([]);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // ✅ fetchMusics - HATA DÜZELTİLDİ
     const fetchMusics = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/music`);
+            // FIX: Tüm müzikleri çekmek için limit eklendi
+            const response = await axios.get(`${API_BASE_URL}/music`, {
+                params: { limit: 500 }
+            });
 
-            // ✅ Response yapısını doğru şekilde parse et
-            // Backend: { success: true, data: { musics: [...], pagination: {...} } }
-            // veya: { success: true, musics: [...] }
             let musicData = [];
-
             if (response.data?.data?.musics) {
-                // Yeni format: response.data.data.musics
                 musicData = response.data.data.musics;
             } else if (response.data?.musics) {
-                // Alternatif format: response.data.musics
                 musicData = response.data.musics;
             } else if (response.data?.music) {
-                // Eski format: response.data.music
                 musicData = response.data.music;
             } else if (Array.isArray(response.data?.data)) {
-                // response.data.data array ise
                 musicData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // response.data direkt array ise
                 musicData = response.data;
             }
 
-            // ✅ Her zaman array olduğundan emin ol
             setMusics(Array.isArray(musicData) ? musicData : []);
-
         } catch (error) {
             console.error('Error fetching musics:', error);
             setError('Müzik kütüphanesi yüklenirken hata oluştu');
-            setMusics([]); // ✅ Hata durumunda boş array set et
+            setMusics([]);
         }
     }, []);
 
+    // ✅ Initial data fetch - genres dahil
     useEffect(() => {
+        fetchGenres();
         fetchPlaylists();
         fetchMusics();
-    }, [fetchPlaylists, fetchMusics]);
+    }, [fetchGenres, fetchPlaylists, fetchMusics]);
 
-    // ✅ Filter musics - GÜVENLİ SPREAD OPERATÖRÜ
+    // ✅ Filter musics - case-insensitive
     useEffect(() => {
-        // ✅ musics'in array olduğundan emin ol
         if (!Array.isArray(musics)) {
             setFilteredMusics([]);
             return;
         }
 
-        let filtered = [...musics]; // ✅ Artık güvenli
+        let filtered = [...musics];
 
         if (selectedMusicCategory !== 'all') {
-            filtered = filtered.filter(music => music?.genre === selectedMusicCategory);
+            const selectedCat = (selectedMusicCategory || '').toLowerCase().trim();
+            filtered = filtered.filter(music => {
+                const musicGenre = (music?.genre || '').toLowerCase().trim();
+                return musicGenre === selectedCat;
+            });
         }
 
         if (musicSearchTerm) {
@@ -215,6 +268,10 @@ export const Playlists = () => {
         }
         if (!/^[A-Z]{2}\d+$/.test(playlistSubCategory.trim())) {
             setError('Alt kategori formatı geçersiz (Örn: AH1, MH1, ID1)');
+            return false;
+        }
+        if (!playlistGenre) {
+            setError('Kategori seçmelisiniz');
             return false;
         }
         if (selectedMusics.length === 0) {
@@ -266,17 +323,15 @@ export const Playlists = () => {
         }
     };
 
-    // ✅ handleEdit - GÜVENLİ MUSİCS ERİŞİMİ
     const handleEdit = (playlist) => {
         setEditingPlaylist(playlist);
         setPlaylistName(playlist.name || '');
         setPlaylistDescription(playlist.description || '');
-        setPlaylistGenre(playlist.genre || 'afrohouse');
+        setPlaylistGenre(playlist.genre || (genres.length > 0 ? genres[0].slug : 'afrohouse'));
         setPlaylistSubCategory(playlist.subCategory || '');
         setCoverImage(playlist.coverImage || '');
         setCoverImagePreview(playlist.coverImage || null);
 
-        // ✅ Güvenli musics erişimi
         const musicIds = Array.isArray(playlist.musics)
             ? playlist.musics.map(m => m?._id || m).filter(Boolean)
             : [];
@@ -318,7 +373,7 @@ export const Playlists = () => {
     const resetForm = () => {
         setPlaylistName('');
         setPlaylistDescription('');
-        setPlaylistGenre('afrohouse');
+        setPlaylistGenre(genres.length > 0 ? genres[0].slug : 'afrohouse');
         setPlaylistSubCategory('');
         setCoverImage('');
         setCoverImagePreview(null);
@@ -331,15 +386,39 @@ export const Playlists = () => {
         setSubmitLoading(false);
     };
 
-    const getGenreData = (genreValue) => {
-        return genres.find(g => g.value === genreValue) || {
-            label: genreValue,
+    // ✅ Genre data helper - dinamik genres ile çalışır
+    const getGenreData = useCallback((genreSlug) => {
+        const found = genres.find(g => g.slug === genreSlug);
+        if (found) {
+            return {
+                label: found.displayName,
+                color: found.color || '#757575',
+                icon: getGenreIcon(genreSlug)
+            };
+        }
+        return {
+            label: genreSlug,
             color: '#757575',
             icon: '🎵'
         };
+    }, [genres]);
+
+    // Genre icon helper
+    const getGenreIcon = (slug) => {
+        const icons = {
+            'afrohouse': '🌍',
+            'indiedance': '💃',
+            'organichouse': '🌿',
+            'downtempo': '🎧',
+            'melodichouse': '🎹',
+            'techno': '⚡',
+            'deephouse': '🌊',
+            'progressive': '🚀'
+        };
+        return icons[slug] || '🎵';
     };
 
-    // ✅ Filtered playlists - GÜVENLİ FİLTRELEME
+    // ✅ Filtered playlists
     const filteredPlaylists = useMemo(() => {
         if (!Array.isArray(playlists)) return [];
 
@@ -388,20 +467,31 @@ export const Playlists = () => {
                         🎵 Admin Playlist Yönetimi
                     </Typography>
                     <Typography variant="body2" color="text.secondary" mt={0.5}>
-                        {filteredPlaylists.length} playlist • {musics.length} müzik mevcut
+                        {filteredPlaylists.length} playlist • {musics.length} müzik • {genres.length} kategori
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setOpenDialog(true)}
-                    sx={{
-                        background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
-                        boxShadow: '0 3px 15px rgba(102, 126, 234, 0.3)',
-                    }}
-                >
-                    Yeni Admin Playlist
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Tooltip title="Kategorileri Yenile">
+                        <IconButton
+                            onClick={fetchGenres}
+                            disabled={genresLoading}
+                        >
+                            <RefreshIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenDialog(true)}
+                        disabled={genres.length === 0}
+                        sx={{
+                            background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+                            boxShadow: '0 3px 15px rgba(102, 126, 234, 0.3)',
+                        }}
+                    >
+                        Yeni Admin Playlist
+                    </Button>
+                </Box>
             </Box>
 
             {/* Alerts */}
@@ -443,14 +533,21 @@ export const Playlists = () => {
                                 label="Kategori"
                                 onChange={(e) => setFilterCategory(e.target.value)}
                             >
-                                {genres.map(genre => (
-                                    <MenuItem key={genre.value} value={genre.value}>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <span>{genre.icon}</span>
-                                            <span>{genre.label}</span>
-                                        </Box>
+                                {genresLoading ? (
+                                    <MenuItem disabled>
+                                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                                        Yükleniyor...
                                     </MenuItem>
-                                ))}
+                                ) : (
+                                    genresWithAll.map(genre => (
+                                        <MenuItem key={genre.slug} value={genre.slug}>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <span>{getGenreIcon(genre.slug)}</span>
+                                                <span>{genre.displayName}</span>
+                                            </Box>
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
                         </FormControl>
                     </Grid>
@@ -628,15 +725,35 @@ export const Playlists = () => {
                                                     value={playlistGenre}
                                                     label="Kategori"
                                                     onChange={(e) => setPlaylistGenre(e.target.value)}
+                                                    disabled={genresLoading}
                                                 >
-                                                    {genres.filter(g => g.value !== 'all').map(genre => (
-                                                        <MenuItem key={genre.value} value={genre.value}>
-                                                            <Box display="flex" alignItems="center" gap={1}>
-                                                                <span>{genre.icon}</span>
-                                                                <span>{genre.label}</span>
-                                                            </Box>
+                                                    {genresLoading ? (
+                                                        <MenuItem disabled>
+                                                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                                                            Yükleniyor...
                                                         </MenuItem>
-                                                    ))}
+                                                    ) : genres.length === 0 ? (
+                                                        <MenuItem disabled>
+                                                            Kategori bulunamadı
+                                                        </MenuItem>
+                                                    ) : (
+                                                        genres.map(genre => (
+                                                            <MenuItem key={genre.slug} value={genre.slug}>
+                                                                <Box display="flex" alignItems="center" gap={1}>
+                                                                    <Box
+                                                                        sx={{
+                                                                            width: 16,
+                                                                            height: 16,
+                                                                            borderRadius: '50%',
+                                                                            backgroundColor: genre.color || '#757575'
+                                                                        }}
+                                                                    />
+                                                                    <span>{getGenreIcon(genre.slug)}</span>
+                                                                    <span>{genre.displayName}</span>
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))
+                                                    )}
                                                 </Select>
                                             </FormControl>
                                         </Grid>
@@ -725,9 +842,9 @@ export const Playlists = () => {
                                             label="Kategori"
                                             onChange={(e) => setSelectedMusicCategory(e.target.value)}
                                         >
-                                            {genres.map(genre => (
-                                                <MenuItem key={genre.value} value={genre.value}>
-                                                    {genre.icon} {genre.label}
+                                            {genresWithAll.map(genre => (
+                                                <MenuItem key={genre.slug} value={genre.slug}>
+                                                    {getGenreIcon(genre.slug)} {genre.displayName}
                                                 </MenuItem>
                                             ))}
                                         </Select>
@@ -760,12 +877,13 @@ export const Playlists = () => {
                                     return (
                                         <ListItem
                                             key={music._id}
-                                            button
                                             onClick={() => handleMusicToggle(music._id)}
                                             sx={{
                                                 borderRadius: 1,
                                                 mb: 0.5,
-                                                backgroundColor: isSelected ? 'action.selected' : 'transparent'
+                                                backgroundColor: isSelected ? 'action.selected' : 'transparent',
+                                                cursor: 'pointer',
+                                                '&:hover': { backgroundColor: 'action.hover' }
                                             }}
                                         >
                                             <ListItemIcon>
@@ -781,9 +899,10 @@ export const Playlists = () => {
                                             </ListItemAvatar>
                                             <ListItemText
                                                 primary={music.title}
+                                                secondaryTypographyProps={{ component: 'div' }}
                                                 secondary={
                                                     <Box display="flex" alignItems="center" gap={1}>
-                                                        <Typography variant="caption">
+                                                        <Typography variant="caption" component="span">
                                                             {music.artist || music.artistNames}
                                                         </Typography>
                                                         <Chip
@@ -828,7 +947,7 @@ export const Playlists = () => {
                     <Button
                         variant="contained"
                         onClick={handleSubmit}
-                        disabled={submitLoading}
+                        disabled={submitLoading || genres.length === 0}
                         startIcon={submitLoading ? <CircularProgress size={20} /> : <AddIcon />}
                     >
                         {editingPlaylist ? 'Güncelle' : 'Oluştur'}

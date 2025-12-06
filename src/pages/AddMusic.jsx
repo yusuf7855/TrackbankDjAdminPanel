@@ -1,5 +1,7 @@
-// AddMusic.jsx - ARTIST SİSTEMİ + DRAG & DROP + 5 PLATFORM
-import React, { useState, useEffect, useCallback } from 'react';
+// AddMusic.jsx - ARTIST SİSTEMİ + DRAG & DROP + 5 PLATFORM + DYNAMIC GENRES
+// FIX: Multi-artist selection input bug fixed
+// FIX: Image upload state sync issue fixed with useRef
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Box,
     Typography,
@@ -46,7 +48,6 @@ import {
     Edit as EditIcon,
     Search as SearchIcon,
     CloudUpload as UploadIcon,
-    Preview as PreviewIcon,
     Save as SaveIcon,
     Clear as ClearIcon,
     Check as CheckIcon,
@@ -62,20 +63,19 @@ import {
     Close as CloseIcon,
     MicExternalOn as ArtistIcon,
     PersonAdd as PersonAddIcon,
-    VerifiedUser as VerifiedIcon,
     Group as GroupIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AddMusic = () => {
-    // Form state - ARTIST SİSTEMİ İLE GÜNCELLENDİ
+    // Form state
     const [musicForm, setMusicForm] = useState({
         title: '',
-        artists: [], // YENİ: Artist objects array
+        artists: [],
         imageUrl: '',
-        genre: 'afrohouse',
+        genre: '',
         platformLinks: {
             spotify: '',
             appleMusic: '',
@@ -86,7 +86,11 @@ const AddMusic = () => {
         isFeatured: false
     });
 
-    // Artist search state - YENİ
+    // Genre state - BACKEND'DEN ÇEKİLİYOR
+    const [genres, setGenres] = useState([]);
+    const [genresLoading, setGenresLoading] = useState(true);
+
+    // Artist search state
     const [artistSearch, setArtistSearch] = useState('');
     const [artistOptions, setArtistOptions] = useState([]);
     const [artistsLoading, setArtistsLoading] = useState(false);
@@ -112,22 +116,17 @@ const AddMusic = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
 
+    // FIX: useRef for reliable image data (state sync issue fix)
+    const imageDataRef = useRef(null);
+    const editImageDataRef = useRef(null);
+
     // Edit dialog states
-    const [editImageFile, setEditImageFile] = useState(null);
+    const [_editImageFile, setEditImageFile] = useState(null);
     const [editImagePreview, setEditImagePreview] = useState(null);
     const [isEditDragging, setIsEditDragging] = useState(false);
     const [editUploadProgress, setEditUploadProgress] = useState(0);
     const [editArtistOptions, setEditArtistOptions] = useState([]);
     const [editArtistSearch, setEditArtistSearch] = useState('');
-
-    const genres = [
-        { value: 'all', label: 'Tüm Türler', color: '#4caf50', icon: '🎵' },
-        { value: 'afrohouse', label: 'Afro House', color: '#ff9800', icon: '🌍' },
-        { value: 'indiedance', label: 'Indie Dance', color: '#e91e63', icon: '💃' },
-        { value: 'organichouse', label: 'Organic House', color: '#8bc34a', icon: '🌿' },
-        { value: 'downtempo', label: 'Down Tempo', color: '#2196f3', icon: '🎧' },
-        { value: 'melodichouse', label: 'Melodic House', color: '#9c27b0', icon: '🎹' }
-    ];
 
     const platformConfig = {
         spotify: {
@@ -162,26 +161,48 @@ const AddMusic = () => {
         }
     };
 
-    // ========== ARTIST SEARCH FUNCTIONS - YENİ ==========
+    // ========== GENRE FETCH ==========
+    const fetchGenres = async () => {
+        try {
+            setGenresLoading(true);
+            const response = await axios.get(`${API_BASE_URL}/api/genres`);
+
+            if (response.data.success && response.data.data) {
+                const genreList = response.data.data;
+                setGenres(genreList);
+
+                if (genreList.length > 0 && !musicForm.genre) {
+                    setMusicForm(prev => ({ ...prev, genre: genreList[0].slug }));
+                }
+            }
+        } catch (error) {
+            console.error('Genre fetch error:', error);
+            setGenres([
+                { slug: 'afrohouse', displayName: 'Afro House' },
+                { slug: 'indiedance', displayName: 'Indie Dance' },
+                { slug: 'organichouse', displayName: 'Organic House' },
+                { slug: 'downtempo', displayName: 'Down Tempo' },
+                { slug: 'melodichouse', displayName: 'Melodic House' }
+            ]);
+        } finally {
+            setGenresLoading(false);
+        }
+    };
+
+    // ========== ARTIST SEARCH FUNCTIONS ==========
     const searchArtists = useCallback(async (query, isEdit = false) => {
         if (!query || query.length < 2) {
-            if (isEdit) {
-                setEditArtistOptions([]);
-            } else {
-                setArtistOptions([]);
-            }
             return;
         }
 
         setArtistsLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/artists`, {
+            const response = await axios.get(`${API_BASE_URL}/api/artists`, {
                 params: { search: query, limit: 20 }
             });
 
             if (response.data.success) {
                 const artists = response.data.data.artists || [];
-                // Filter out already selected artists
                 const selectedIds = isEdit
                     ? (editingMusic?.artists || []).map(a => a._id || a)
                     : musicForm.artists.map(a => a._id);
@@ -218,11 +239,14 @@ const AddMusic = () => {
         return () => clearTimeout(timer);
     }, [editArtistSearch, searchArtists, openEditDialog]);
 
-    // Load initial artists
+    // Load initial data
     useEffect(() => {
+        fetchGenres();
+        fetchMusic();
+
         const loadInitialArtists = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/artists`, {
+                const response = await axios.get(`${API_BASE_URL}/api/artists`, {
                     params: { limit: 50 }
                 });
                 if (response.data.success) {
@@ -246,7 +270,7 @@ const AddMusic = () => {
 
         setCreatingArtist(true);
         try {
-            const response = await axios.post(`${API_BASE_URL}/artists`, {
+            const response = await axios.post(`${API_BASE_URL}/api/artists`, {
                 name: newArtistName.trim()
             });
 
@@ -254,7 +278,6 @@ const AddMusic = () => {
                 const newArtist = response.data.data.artist;
 
                 if (isEdit && editingMusic) {
-                    // Edit form için
                     const currentArtists = editingMusic.artists || [];
                     setEditingMusic({
                         ...editingMusic,
@@ -262,7 +285,6 @@ const AddMusic = () => {
                     });
                     setEditArtistOptions(prev => [newArtist, ...prev]);
                 } else {
-                    // Add form için
                     setMusicForm(prev => ({
                         ...prev,
                         artists: [...prev.artists, newArtist]
@@ -283,15 +305,15 @@ const AddMusic = () => {
     };
 
     // ========== EXISTING FUNCTIONS ==========
-    useEffect(() => {
-        fetchMusic();
-    }, []);
-
     const fetchMusic = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/music`);
+            // FIX: Tüm müzikleri çekmek için limit artırıldı
+            const response = await axios.get(`${API_BASE_URL}/api/music`, {
+                params: { limit: 500 }
+            });
             const data = response.data.data?.musics || response.data.musics || response.data.music || response.data || [];
+            console.log('📥 Fetched music count:', Array.isArray(data) ? data.length : 0);
             setMusicList(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching music:', error);
@@ -319,6 +341,7 @@ const AddMusic = () => {
     // Artist handlers for add form
     const handleArtistSelect = (event, newValue) => {
         setMusicForm(prev => ({ ...prev, artists: newValue }));
+        setArtistSearch(''); // Reset search after selection
     };
 
     const handleRemoveArtist = (artistToRemove) => {
@@ -331,6 +354,7 @@ const AddMusic = () => {
     // Artist handlers for edit form
     const handleEditArtistSelect = (event, newValue) => {
         setEditingMusic(prev => ({ ...prev, artists: newValue }));
+        setEditArtistSearch(''); // Reset search after selection
     };
 
     const handleRemoveEditArtist = (artistToRemove) => {
@@ -371,52 +395,36 @@ const AddMusic = () => {
         setUploadProgress(0);
 
         const reader = new FileReader();
-
         reader.onloadstart = () => setUploadProgress(10);
-
         reader.onprogress = (e) => {
             if (e.lengthComputable) {
                 setUploadProgress((e.loaded / e.total) * 100);
             }
         };
-
         reader.onloadend = () => {
-            setImagePreview(reader.result);
-            setMusicForm({ ...musicForm, imageUrl: reader.result });
+            const base64Result = reader.result;
+            console.log('✅ Image loaded, length:', base64Result?.length);
+
+            // FIX: Ref'e de yaz - state sync sorununu aşmak için
+            imageDataRef.current = base64Result;
+
+            setImagePreview(base64Result);
+            setMusicForm(prev => ({ ...prev, imageUrl: base64Result }));
             setUploadProgress(100);
             setTimeout(() => setUploadProgress(0), 1000);
         };
-
         reader.onerror = () => {
             setError('Görsel yüklenirken hata oluştu');
             setUploadProgress(0);
         };
-
         reader.readAsDataURL(file);
     };
 
-    const handleDragEnter = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(true);
-    };
-
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
+    const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+    const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+    const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
     const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-
+        e.preventDefault(); e.stopPropagation(); setIsDragging(false);
         const files = e.dataTransfer.files;
         if (files && files.length > 0 && validateImage(files[0])) {
             processImageFile(files[0]);
@@ -426,7 +434,8 @@ const AddMusic = () => {
     const handleRemoveImage = () => {
         setImageFile(null);
         setImagePreview(null);
-        setMusicForm({ ...musicForm, imageUrl: '' });
+        imageDataRef.current = null; // FIX: Ref'i de temizle
+        setMusicForm(prev => ({ ...prev, imageUrl: '' }));
         setUploadProgress(0);
     };
 
@@ -443,52 +452,36 @@ const AddMusic = () => {
         setEditUploadProgress(0);
 
         const reader = new FileReader();
-
         reader.onloadstart = () => setEditUploadProgress(10);
-
         reader.onprogress = (e) => {
             if (e.lengthComputable) {
                 setEditUploadProgress((e.loaded / e.total) * 100);
             }
         };
-
         reader.onloadend = () => {
-            setEditImagePreview(reader.result);
-            setEditingMusic({ ...editingMusic, imageUrl: reader.result });
+            const base64Result = reader.result;
+            console.log('✅ Edit image loaded, length:', base64Result?.length);
+
+            // FIX: Ref'e de yaz
+            editImageDataRef.current = base64Result;
+
+            setEditImagePreview(base64Result);
+            setEditingMusic(prev => ({ ...prev, imageUrl: base64Result }));
             setEditUploadProgress(100);
             setTimeout(() => setEditUploadProgress(0), 1000);
         };
-
         reader.onerror = () => {
             setError('Görsel yüklenirken hata oluştu');
             setEditUploadProgress(0);
         };
-
         reader.readAsDataURL(file);
     };
 
-    const handleEditDragEnter = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsEditDragging(true);
-    };
-
-    const handleEditDragLeave = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsEditDragging(false);
-    };
-
-    const handleEditDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
+    const handleEditDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsEditDragging(true); };
+    const handleEditDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsEditDragging(false); };
+    const handleEditDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
     const handleEditDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsEditDragging(false);
-
+        e.preventDefault(); e.stopPropagation(); setIsEditDragging(false);
         const files = e.dataTransfer.files;
         if (files && files.length > 0 && validateImage(files[0])) {
             processEditImageFile(files[0]);
@@ -498,6 +491,7 @@ const AddMusic = () => {
     const handleRemoveEditImage = () => {
         setEditImageFile(null);
         setEditImagePreview(null);
+        editImageDataRef.current = null; // FIX: Ref'i de temizle
         setEditUploadProgress(0);
     };
 
@@ -510,8 +504,13 @@ const AddMusic = () => {
             setError('En az bir artist seçmelisiniz');
             return false;
         }
-        if (!musicForm.imageUrl && !imageFile) {
+        // FIX: Ref'i de kontrol et
+        if (!imageDataRef.current && !musicForm.imageUrl && !imagePreview && !imageFile) {
             setError('Şarkı görseli gereklidir');
+            return false;
+        }
+        if (!musicForm.genre) {
+            setError('Tür seçmelisiniz');
             return false;
         }
 
@@ -526,25 +525,42 @@ const AddMusic = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
         if (!validateForm()) return;
 
         setSubmitLoading(true);
         setError(null);
 
         try {
+            // FIX: Önce ref'ten, sonra state'lerden al
+            const finalImageUrl = imageDataRef.current || musicForm.imageUrl || imagePreview;
+
+            console.log('📤 Image sources:', {
+                ref: imageDataRef.current ? `[${imageDataRef.current.length} chars]` : 'null',
+                formState: musicForm.imageUrl ? `[${musicForm.imageUrl.length} chars]` : 'null',
+                preview: imagePreview ? `[${imagePreview.length} chars]` : 'null',
+                final: finalImageUrl ? `[${finalImageUrl.length} chars]` : 'NULL!'
+            });
+
+            if (!finalImageUrl) {
+                setError('Görsel yüklenemedi, lütfen tekrar deneyin');
+                setSubmitLoading(false);
+                return;
+            }
+
             const submitData = {
                 title: musicForm.title.trim(),
-                artists: musicForm.artists.map(a => a.name), // Send artist names
-                imageUrl: musicForm.imageUrl,
+                artists: musicForm.artists.map(a => a.name),
+                imageUrl: finalImageUrl,
                 genre: musicForm.genre,
                 isFeatured: musicForm.isFeatured,
                 platformLinks: Object.fromEntries(
-                    Object.entries(musicForm.platformLinks).filter(([_, value]) => value.trim() !== '')
+                    Object.entries(musicForm.platformLinks).filter(([, value]) => value.trim() !== '')
                 )
             };
 
-            await axios.post(`${API_BASE_URL}/music`, submitData);
+            console.log('📤 Submitting music:', { ...submitData, imageUrl: `[base64 ${submitData.imageUrl.length} chars]` });
+
+            await axios.post(`${API_BASE_URL}/api/music`, submitData);
             setSuccess('Müzik başarıyla eklendi! 🎵');
             clearForm();
             fetchMusic();
@@ -557,12 +573,10 @@ const AddMusic = () => {
     };
 
     const handleEdit = (music) => {
-        // Artists'i normalize et (populate edilmiş veya edilmemiş olabilir)
         let normalizedArtists = [];
         if (music.artists && music.artists.length > 0) {
             normalizedArtists = music.artists.map(a => {
                 if (typeof a === 'object') return a;
-                // Sadece ID ise, options'dan bul
                 const found = artistOptions.find(opt => opt._id === a);
                 return found || { _id: a, name: 'Unknown' };
             });
@@ -580,7 +594,9 @@ const AddMusic = () => {
             }
         });
         setEditImagePreview(music.imageUrl || null);
+        editImageDataRef.current = music.imageUrl || null; // FIX: Mevcut image'ı ref'e yaz
         setEditImageFile(null);
+        setEditArtistSearch('');
         setOpenEditDialog(true);
     };
 
@@ -596,23 +612,27 @@ const AddMusic = () => {
 
         setSubmitLoading(true);
         try {
+            // FIX: Önce ref'ten, sonra state'lerden al
+            const finalImageUrl = editImageDataRef.current || editingMusic.imageUrl || editImagePreview;
+
             const updateData = {
                 title: editingMusic.title.trim(),
                 artists: editingMusic.artists.map(a => a.name || a),
-                imageUrl: editingMusic.imageUrl,
+                imageUrl: finalImageUrl,
                 genre: editingMusic.genre,
                 isFeatured: editingMusic.isFeatured,
                 platformLinks: Object.fromEntries(
-                    Object.entries(editingMusic.platformLinks || {}).filter(([_, value]) => value?.trim() !== '')
+                    Object.entries(editingMusic.platformLinks || {}).filter(([, value]) => value?.trim() !== '')
                 )
             };
 
-            await axios.put(`${API_BASE_URL}/music/${editingMusic._id}`, updateData);
+            await axios.put(`${API_BASE_URL}/api/music/${editingMusic._id}`, updateData);
             setSuccess('Müzik başarıyla güncellendi! ✅');
             setOpenEditDialog(false);
             setEditingMusic(null);
             setEditImagePreview(null);
             setEditImageFile(null);
+            editImageDataRef.current = null;
             await fetchMusic();
         } catch (error) {
             setError(error.response?.data?.message || 'Müzik güncellenirken hata oluştu');
@@ -624,10 +644,11 @@ const AddMusic = () => {
     const handleDelete = async (id) => {
         if (window.confirm('Bu müziği silmek istediğinizden emin misiniz?')) {
             try {
-                await axios.delete(`${API_BASE_URL}/music/${id}`);
+                await axios.delete(`${API_BASE_URL}/api/music/${id}`);
                 setSuccess('Müzik başarıyla silindi! 🗑️');
                 fetchMusic();
-            } catch (error) {
+            } catch (err) {
+                console.error('Silme hatası:', err);
                 setError('Müzik silinirken hata oluştu');
             }
         }
@@ -638,7 +659,7 @@ const AddMusic = () => {
             title: '',
             artists: [],
             imageUrl: '',
-            genre: 'afrohouse',
+            genre: genres.length > 0 ? genres[0].slug : '',
             platformLinks: {
                 spotify: '',
                 appleMusic: '',
@@ -650,9 +671,11 @@ const AddMusic = () => {
         });
         setImageFile(null);
         setImagePreview(null);
+        imageDataRef.current = null; // FIX: Ref'i de temizle
         setError(null);
         setActiveTab(0);
         setUploadProgress(0);
+        setArtistSearch('');
     };
 
     const filteredMusic = musicList.filter(music => {
@@ -660,18 +683,25 @@ const AddMusic = () => {
         const artistNames = music.artistNames || music.artist || '';
         const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             artistNames.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesGenre = filterGenre === 'all' || music.genre === filterGenre;
+
+        // FIX: Case-insensitive genre comparison
+        const musicGenre = (music.genre || '').toLowerCase().trim();
+        const selectedGenre = (filterGenre || '').toLowerCase().trim();
+        const matchesGenre = selectedGenre === 'all' || musicGenre === selectedGenre;
+
         return matchesSearch && matchesGenre;
     });
 
-    const getGenreColor = (genre) => genres.find(g => g.value === genre)?.color || '#757575';
-    const getGenreIcon = (genre) => genres.find(g => g.value === genre)?.icon || '🎵';
+    const getGenreDisplayName = (slug) => {
+        const genre = genres.find(g => g.slug === slug);
+        return genre?.displayName || slug;
+    };
+
     const getPlatformCount = (platformLinks) => {
         if (!platformLinks) return 0;
         return Object.values(platformLinks).filter(link => link).length;
     };
 
-    // Get display artist name
     const getDisplayArtist = (music) => {
         if (music.artistNames) return music.artistNames;
         if (music.artists && music.artists.length > 0) {
@@ -682,16 +712,9 @@ const AddMusic = () => {
 
     // Drag & Drop Image Component
     const DragDropImageUpload = ({
-                                     preview,
-                                     isDragging,
-                                     uploadProgress,
-                                     onDragEnter,
-                                     onDragLeave,
-                                     onDragOver,
-                                     onDrop,
-                                     onFileSelect,
-                                     onRemove,
-                                     inputId
+                                     preview, isDragging, uploadProgress,
+                                     onDragEnter, onDragLeave, onDragOver, onDrop,
+                                     onFileSelect, onRemove, inputId
                                  }) => (
         <Box
             onDragEnter={onDragEnter}
@@ -709,81 +732,28 @@ const AddMusic = () => {
                 bgcolor: isDragging ? 'primary.light' : preview ? 'transparent' : 'grey.50',
                 transition: 'all 0.3s ease',
                 position: 'relative',
-                '&:hover': !preview && {
-                    borderColor: 'primary.main',
-                    bgcolor: 'primary.light'
-                }
+                '&:hover': !preview && { borderColor: 'primary.main', bgcolor: 'primary.light' }
             }}
         >
-            <input
-                id={inputId}
-                type="file"
-                accept="image/*"
-                onChange={onFileSelect}
-                style={{ display: 'none' }}
-            />
+            <input id={inputId} type="file" accept="image/*" onChange={onFileSelect} style={{ display: 'none' }} />
 
             {preview ? (
                 <Box position="relative">
-                    <CardMedia
-                        component="img"
-                        image={preview}
-                        alt="Preview"
-                        sx={{
-                            width: '100%',
-                            maxHeight: 400,
-                            objectFit: 'cover',
-                            borderRadius: 2
-                        }}
-                    />
-                    <IconButton
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onRemove();
-                        }}
-                        sx={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            bgcolor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
-                        }}
-                    >
+                    <CardMedia component="img" image={preview} alt="Preview"
+                               sx={{ width: '100%', maxHeight: 400, objectFit: 'cover', borderRadius: 2 }} />
+                    <IconButton onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                                sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.7)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' } }}>
                         <CloseIcon />
                     </IconButton>
-                    <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                            position: 'absolute',
-                            bottom: 16,
-                            left: '50%',
-                            transform: 'translateX(-50%)'
-                        }}
-                    >
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<PhotoCameraIcon />}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                document.getElementById(inputId).click();
-                            }}
-                            sx={{ bgcolor: 'rgba(0,0,0,0.7)', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' } }}
-                        >
+                    <Stack direction="row" spacing={1}
+                           sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}>
+                        <Button variant="contained" size="small" startIcon={<PhotoCameraIcon />}
+                                onClick={(e) => { e.stopPropagation(); document.getElementById(inputId).click(); }}
+                                sx={{ bgcolor: 'rgba(0,0,0,0.7)', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' } }}>
                             Değiştir
                         </Button>
-                        <Button
-                            variant="contained"
-                            size="small"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRemove();
-                            }}
-                        >
+                        <Button variant="contained" size="small" color="error" startIcon={<DeleteIcon />}
+                                onClick={(e) => { e.stopPropagation(); onRemove(); }}>
                             Kaldır
                         </Button>
                     </Stack>
@@ -791,14 +761,9 @@ const AddMusic = () => {
             ) : (
                 <Box>
                     <UploadIcon sx={{
-                        fontSize: 64,
-                        color: isDragging ? 'primary.main' : 'text.secondary',
-                        mb: 2,
+                        fontSize: 64, color: isDragging ? 'primary.main' : 'text.secondary', mb: 2,
                         animation: isDragging ? 'bounce 1s infinite' : 'none',
-                        '@keyframes bounce': {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-10px)' }
-                        }
+                        '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } }
                     }} />
                     <Typography variant="h6" gutterBottom fontWeight="bold">
                         {isDragging ? 'Görseli Buraya Bırakın' : 'Görsel Yükle'}
@@ -824,17 +789,10 @@ const AddMusic = () => {
         </Box>
     );
 
-    // Artist Select Component (Reusable)
+    // Artist Select Component - FIX: inputValue kontrolü düzeltildi
     const ArtistSelectComponent = ({
-                                       value,
-                                       onChange,
-                                       onRemove,
-                                       options,
-                                       loading,
-                                       onInputChange,
-                                       inputValue,
-                                       placeholder,
-                                       onCreateNew
+                                       value, onChange, onRemove, options, loading,
+                                       onInputChange, inputValue, placeholder, onCreateNew
                                    }) => (
         <Box>
             <Autocomplete
@@ -842,12 +800,21 @@ const AddMusic = () => {
                 options={options}
                 value={value}
                 onChange={onChange}
-                onInputChange={(e, newValue) => onInputChange(newValue)}
+                // FIX: onInputChange'de reason kontrolü
+                onInputChange={(event, newInputValue, reason) => {
+                    // Sadece kullanıcı yazarken güncelle, reset/clear durumlarında boşalt
+                    if (reason === 'input') {
+                        onInputChange(newInputValue);
+                    } else if (reason === 'clear' || reason === 'reset') {
+                        onInputChange('');
+                    }
+                }}
                 inputValue={inputValue}
                 getOptionLabel={(option) => option.name || ''}
                 isOptionEqualToValue={(option, val) => option._id === (val._id || val)}
                 loading={loading}
                 filterSelectedOptions
+                clearOnBlur={false}
                 noOptionsText={inputValue.length < 2 ? "En az 2 karakter yazın" : "Artist bulunamadı"}
                 renderOption={(props, option) => (
                     <li {...props} key={option._id}>
@@ -856,9 +823,7 @@ const AddMusic = () => {
                                 {option.name?.charAt(0)}
                             </Avatar>
                             <Box sx={{ flexGrow: 1 }}>
-                                <Typography variant="body2" fontWeight="bold">
-                                    {option.name}
-                                </Typography>
+                                <Typography variant="body2" fontWeight="bold">{option.name}</Typography>
                                 <Typography variant="caption" color="text.secondary">
                                     {option.claimStatus === 'claimed' ? '✓ Verified Artist' : 'Artist'}
                                 </Typography>
@@ -871,21 +836,10 @@ const AddMusic = () => {
                         <Chip
                             {...getTagProps({ index })}
                             key={option._id || index}
-                            avatar={
-                                <Avatar src={option.profileImage} sx={{ bgcolor: '#7C3AED' }}>
-                                    {(option.name || '?').charAt(0)}
-                                </Avatar>
-                            }
+                            avatar={<Avatar src={option.profileImage} sx={{ bgcolor: '#7C3AED' }}>{(option.name || '?').charAt(0)}</Avatar>}
                             label={option.name || 'Unknown'}
                             onDelete={() => onRemove(option)}
-                            sx={{
-                                bgcolor: '#F3E8FF',
-                                color: '#7C3AED',
-                                '& .MuiChip-deleteIcon': {
-                                    color: '#7C3AED',
-                                    '&:hover': { color: '#6D28D9' }
-                                }
-                            }}
+                            sx={{ bgcolor: '#F3E8FF', color: '#7C3AED', '& .MuiChip-deleteIcon': { color: '#7C3AED', '&:hover': { color: '#6D28D9' } } }}
                         />
                     ))
                 }
@@ -897,9 +851,7 @@ const AddMusic = () => {
                             ...params.InputProps,
                             startAdornment: (
                                 <>
-                                    <InputAdornment position="start">
-                                        <ArtistIcon sx={{ color: '#7C3AED' }} />
-                                    </InputAdornment>
+                                    <InputAdornment position="start"><ArtistIcon sx={{ color: '#7C3AED' }} /></InputAdornment>
                                     {params.InputProps.startAdornment}
                                 </>
                             ),
@@ -913,19 +865,12 @@ const AddMusic = () => {
                     />
                 )}
             />
-            <Button
-                startIcon={<PersonAddIcon />}
-                onClick={onCreateNew}
-                sx={{ mt: 1, color: '#7C3AED' }}
-                size="small"
-            >
+            <Button startIcon={<PersonAddIcon />} onClick={onCreateNew} sx={{ mt: 1, color: '#7C3AED' }} size="small">
                 Yeni Artist Oluştur
             </Button>
             {value.length > 0 && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: '#F9FAFB', borderRadius: 1 }}>
-                    <Typography variant="caption" color="text.secondary">
-                        Seçilen Artistler ({value.length}):
-                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Seçilen Artistler ({value.length}):</Typography>
                     <Typography variant="body2" fontWeight="bold" sx={{ mt: 0.5 }}>
                         {value.map(a => a.name || a).join(', ')}
                     </Typography>
@@ -938,13 +883,9 @@ const AddMusic = () => {
         <Box sx={{ p: 3 }}>
             {/* Header */}
             <Box display="flex" alignItems="center" mb={4}>
-                <Avatar sx={{ bgcolor: '#7C3AED', mr: 2, width: 56, height: 56 }}>
-                    <MusicIcon />
-                </Avatar>
+                <Avatar sx={{ bgcolor: '#7C3AED', mr: 2, width: 56, height: 56 }}><MusicIcon /></Avatar>
                 <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                        Müzik Yönetimi
-                    </Typography>
+                    <Typography variant="h4" fontWeight="bold">Müzik Yönetimi</Typography>
                     <Typography variant="subtitle1" color="text.secondary">
                         Multi-Artist Desteği • 5 Platform: Spotify, Apple Music, YouTube Music, Beatport, SoundCloud
                     </Typography>
@@ -953,16 +894,8 @@ const AddMusic = () => {
 
             {/* Alerts */}
             <Stack spacing={2} mb={3}>
-                {error && (
-                    <Fade in>
-                        <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>
-                    </Fade>
-                )}
-                {success && (
-                    <Fade in>
-                        <Alert severity="success" onClose={() => setSuccess(null)}>{success}</Alert>
-                    </Fade>
-                )}
+                {error && <Fade in><Alert severity="error" onClose={() => setError(null)}>{error}</Alert></Fade>}
+                {success && <Fade in><Alert severity="success" onClose={() => setSuccess(null)}>{success}</Alert></Fade>}
             </Stack>
 
             <Grid container spacing={3}>
@@ -971,12 +904,8 @@ const AddMusic = () => {
                     <Card>
                         <CardContent>
                             <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-                                <Typography variant="h6" fontWeight="bold">
-                                    Yeni Müzik Ekle
-                                </Typography>
-                                <Button size="small" onClick={clearForm} startIcon={<ClearIcon />} color="inherit">
-                                    Temizle
-                                </Button>
+                                <Typography variant="h6" fontWeight="bold">Yeni Müzik Ekle</Typography>
+                                <Button size="small" onClick={clearForm} startIcon={<ClearIcon />} color="inherit">Temizle</Button>
                             </Box>
 
                             <form onSubmit={handleSubmit}>
@@ -990,16 +919,11 @@ const AddMusic = () => {
                                 {activeTab === 0 && (
                                     <Stack spacing={3}>
                                         <TextField
-                                            fullWidth
-                                            label="Şarkı Adı"
-                                            name="title"
-                                            value={musicForm.title}
-                                            onChange={handleInputChange}
-                                            required
-                                            placeholder="Örn: Sunset Dreams"
+                                            fullWidth label="Şarkı Adı" name="title"
+                                            value={musicForm.title} onChange={handleInputChange}
+                                            required placeholder="Örn: Sunset Dreams"
                                         />
 
-                                        {/* YENİ: Artist Multi-Select */}
                                         <Box>
                                             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                                                 Artistler * (Birden fazla seçebilirsiniz)
@@ -1025,16 +949,19 @@ const AddMusic = () => {
                                                 label="Tür"
                                                 onChange={handleInputChange}
                                                 required
+                                                disabled={genresLoading}
                                             >
-                                                {genres.filter(g => g.value !== 'all').map(genre => (
-                                                    <MenuItem key={genre.value} value={genre.value}>
-                                                        <Box display="flex" alignItems="center">
-                                                            <Typography sx={{ mr: 1 }}>{genre.icon}</Typography>
-                                                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: genre.color, mr: 1 }} />
-                                                            {genre.label}
-                                                        </Box>
+                                                {genresLoading ? (
+                                                    <MenuItem disabled>
+                                                        <CircularProgress size={16} sx={{ mr: 1 }} /> Yükleniyor...
                                                     </MenuItem>
-                                                ))}
+                                                ) : (
+                                                    genres.map(genre => (
+                                                        <MenuItem key={genre.slug} value={genre.slug}>
+                                                            {genre.displayName}
+                                                        </MenuItem>
+                                                    ))
+                                                )}
                                             </Select>
                                         </FormControl>
 
@@ -1065,24 +992,16 @@ const AddMusic = () => {
 
                                         {Object.entries(platformConfig).map(([key, config]) => (
                                             <TextField
-                                                key={key}
-                                                fullWidth
-                                                label={config.label}
+                                                key={key} fullWidth label={config.label}
                                                 value={musicForm.platformLinks[key]}
                                                 onChange={(e) => handlePlatformLinkChange(key, e.target.value)}
                                                 placeholder={config.placeholder}
-                                                InputProps={{
-                                                    startAdornment: (
-                                                        <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box>
-                                                    )
-                                                }}
+                                                InputProps={{ startAdornment: <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box> }}
                                             />
                                         ))}
 
                                         <Paper sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
-                                            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                                                Platform Durumu:
-                                            </Typography>
+                                            <Typography variant="subtitle2" gutterBottom fontWeight="bold">Platform Durumu:</Typography>
                                             <Stack spacing={1}>
                                                 {Object.entries(platformConfig).map(([key, config]) => (
                                                     <Box key={key} display="flex" alignItems="center" justifyContent="space-between">
@@ -1101,11 +1020,8 @@ const AddMusic = () => {
                                             <Divider sx={{ my: 2 }} />
                                             <Box display="flex" justifyContent="space-between" alignItems="center">
                                                 <Typography variant="caption" color="text.secondary">Toplam Platform:</Typography>
-                                                <Chip
-                                                    label={`${getPlatformCount(musicForm.platformLinks)} / 5`}
-                                                    size="small"
-                                                    color={getPlatformCount(musicForm.platformLinks) > 0 ? 'primary' : 'default'}
-                                                />
+                                                <Chip label={`${getPlatformCount(musicForm.platformLinks)} / 5`} size="small"
+                                                      color={getPlatformCount(musicForm.platformLinks) > 0 ? 'primary' : 'default'} />
                                             </Box>
                                         </Paper>
                                     </Stack>
@@ -1115,26 +1031,18 @@ const AddMusic = () => {
                                 {activeTab === 2 && (
                                     <Stack spacing={3}>
                                         <DragDropImageUpload
-                                            preview={imagePreview}
-                                            isDragging={isDragging}
-                                            uploadProgress={uploadProgress}
-                                            onDragEnter={handleDragEnter}
-                                            onDragLeave={handleDragLeave}
-                                            onDragOver={handleDragOver}
-                                            onDrop={handleDrop}
-                                            onFileSelect={handleImageChange}
-                                            onRemove={handleRemoveImage}
+                                            preview={imagePreview} isDragging={isDragging} uploadProgress={uploadProgress}
+                                            onDragEnter={handleDragEnter} onDragLeave={handleDragLeave}
+                                            onDragOver={handleDragOver} onDrop={handleDrop}
+                                            onFileSelect={handleImageChange} onRemove={handleRemoveImage}
                                             inputId="image-upload"
                                         />
 
                                         <Divider>VEYA</Divider>
 
                                         <TextField
-                                            fullWidth
-                                            label="Görsel URL"
-                                            name="imageUrl"
-                                            value={musicForm.imageUrl}
-                                            onChange={handleInputChange}
+                                            fullWidth label="Görsel URL" name="imageUrl"
+                                            value={musicForm.imageUrl} onChange={handleInputChange}
                                             placeholder="https://example.com/image.jpg"
                                             helperText="Harici bir görsel linki girebilirsiniz"
                                             disabled={!!imagePreview}
@@ -1154,28 +1062,16 @@ const AddMusic = () => {
                                 {/* Submit Button */}
                                 <Box sx={{ mt: 4 }}>
                                     <Button
-                                        type="submit"
-                                        variant="contained"
-                                        size="large"
-                                        fullWidth
+                                        type="submit" variant="contained" size="large" fullWidth
                                         disabled={submitLoading}
                                         startIcon={submitLoading ? <CircularProgress size={20} /> : <AddIcon />}
-                                        sx={{
-                                            py: 1.5,
-                                            bgcolor: '#7C3AED',
-                                            '&:hover': { bgcolor: '#6D28D9' }
-                                        }}
+                                        sx={{ py: 1.5, bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}
                                     >
                                         {submitLoading ? 'Ekleniyor...' : 'Müzik Ekle'}
                                     </Button>
 
                                     {activeTab < 2 && (
-                                        <Button
-                                            fullWidth
-                                            variant="outlined"
-                                            onClick={() => setActiveTab(activeTab + 1)}
-                                            sx={{ mt: 2 }}
-                                        >
+                                        <Button fullWidth variant="outlined" onClick={() => setActiveTab(activeTab + 1)} sx={{ mt: 2 }}>
                                             Sonraki Adım
                                         </Button>
                                     )}
@@ -1190,37 +1086,26 @@ const AddMusic = () => {
                     <Card>
                         <CardContent>
                             <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-                                <Typography variant="h6" fontWeight="bold">
-                                    Müzik Listesi ({filteredMusic.length})
-                                </Typography>
-                                <Button size="small" onClick={fetchMusic} startIcon={<SearchIcon />} color="inherit">
-                                    Yenile
-                                </Button>
+                                <Typography variant="h6" fontWeight="bold">Müzik Listesi ({filteredMusic.length})</Typography>
+                                <Button size="small" onClick={fetchMusic} startIcon={<SearchIcon />} color="inherit">Yenile</Button>
                             </Box>
 
                             <Grid container spacing={2} mb={3}>
                                 <Grid item xs={12} sm={8}>
                                     <TextField
-                                        fullWidth
-                                        size="small"
-                                        placeholder="Şarkı veya sanatçı ara..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        InputProps={{
-                                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                        }}
+                                        fullWidth size="small" placeholder="Şarkı veya sanatçı ara..."
+                                        value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                                        InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Tür</InputLabel>
                                         <Select value={filterGenre} label="Tür" onChange={(e) => setFilterGenre(e.target.value)}>
+                                            <MenuItem value="all">Tüm Türler</MenuItem>
                                             {genres.map(genre => (
-                                                <MenuItem key={genre.value} value={genre.value}>
-                                                    <Box display="flex" alignItems="center">
-                                                        <Typography sx={{ mr: 1 }}>{genre.icon}</Typography>
-                                                        {genre.label}
-                                                    </Box>
+                                                <MenuItem key={genre.slug} value={genre.slug}>
+                                                    {genre.displayName}
                                                 </MenuItem>
                                             ))}
                                         </Select>
@@ -1229,9 +1114,7 @@ const AddMusic = () => {
                             </Grid>
 
                             {loading ? (
-                                <Box display="flex" justifyContent="center" py={4}>
-                                    <CircularProgress />
-                                </Box>
+                                <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
                             ) : (
                                 <List sx={{ maxHeight: 600, overflow: 'auto' }}>
                                     {filteredMusic.map((music, index) => (
@@ -1242,21 +1125,18 @@ const AddMusic = () => {
 
                                             <ListItemText
                                                 primary={
-                                                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                                                        <Typography variant="subtitle1" fontWeight="bold">
-                                                            {music.title}
-                                                        </Typography>
+                                                    <Box component="span" display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                                        <Typography component="span" variant="subtitle1" fontWeight="bold">{music.title}</Typography>
                                                         <Chip
-                                                            label={genres.find(g => g.value === music.genre)?.label || music.genre}
+                                                            label={getGenreDisplayName(music.genre)}
                                                             size="small"
-                                                            sx={{ bgcolor: getGenreColor(music.genre), color: 'white', fontWeight: 'bold' }}
+                                                            sx={{ bgcolor: '#7C3AED', color: 'white', fontWeight: 'bold' }}
                                                         />
                                                         {music.isFeatured && (
                                                             <Tooltip title="Öne Çıkan">
                                                                 <StarIcon sx={{ color: 'warning.main', fontSize: 20 }} />
                                                             </Tooltip>
                                                         )}
-                                                        {/* YENİ: Artist count badge */}
                                                         {music.artists && music.artists.length > 1 && (
                                                             <Tooltip title={`${music.artists.length} Artist`}>
                                                                 <Badge badgeContent={music.artists.length} color="secondary">
@@ -1264,31 +1144,24 @@ const AddMusic = () => {
                                                                 </Badge>
                                                             </Tooltip>
                                                         )}
-                                                        <Chip
-                                                            label={`${getPlatformCount(music.platformLinks)}/5`}
-                                                            size="small"
-                                                            color="primary"
-                                                            variant="outlined"
-                                                        />
+                                                        <Chip label={`${getPlatformCount(music.platformLinks)}/5`} size="small" color="primary" variant="outlined" />
                                                     </Box>
                                                 }
+                                                secondaryTypographyProps={{ component: 'div' }}
                                                 secondary={
                                                     <Box>
-                                                        {/* YENİ: Display artist with icon */}
                                                         <Box display="flex" alignItems="center" gap={0.5}>
                                                             <ArtistIcon sx={{ fontSize: 14, color: '#7C3AED' }} />
-                                                            <Typography variant="body2" color="text.secondary">
+                                                            <Typography component="span" variant="body2" color="text.secondary">
                                                                 {getDisplayArtist(music)}
                                                             </Typography>
                                                         </Box>
                                                         <Stack direction="row" spacing={2} mt={0.5}>
-                                                            <Typography variant="caption" color="text.secondary" display="flex" alignItems="center">
-                                                                <LikesIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                                                {music.likes || 0}
+                                                            <Typography component="span" variant="caption" color="text.secondary" display="flex" alignItems="center">
+                                                                <LikesIcon sx={{ fontSize: 14, mr: 0.5 }} />{music.likes || 0}
                                                             </Typography>
-                                                            <Typography variant="caption" color="text.secondary" display="flex" alignItems="center">
-                                                                <ViewsIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                                                {music.views || 0}
+                                                            <Typography component="span" variant="caption" color="text.secondary" display="flex" alignItems="center">
+                                                                <ViewsIcon sx={{ fontSize: 14, mr: 0.5 }} />{music.views || 0}
                                                             </Typography>
                                                         </Stack>
                                                         <Stack direction="row" spacing={0.5} mt={1}>
@@ -1359,56 +1232,37 @@ const AddMusic = () => {
                 </Grid>
             </Grid>
 
-            {/* Edit Dialog - ARTIST SİSTEMİ İLE GÜNCELLENDİ */}
+            {/* Edit Dialog */}
             <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="md" fullWidth>
                 <DialogTitle sx={{ bgcolor: '#7C3AED', color: '#fff' }}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <EditIcon />
-                        Müzik Düzenle
-                    </Box>
+                    <Box display="flex" alignItems="center" gap={1}><EditIcon />Müzik Düzenle</Box>
                 </DialogTitle>
                 <DialogContent>
                     {editingMusic && (
                         <Stack spacing={3} sx={{ mt: 2 }}>
-                            {/* Image Upload */}
                             <Box>
-                                <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                                    Şarkı Görseli
-                                </Typography>
+                                <Typography variant="subtitle2" gutterBottom fontWeight="bold">Şarkı Görseli</Typography>
                                 <DragDropImageUpload
-                                    preview={editImagePreview}
-                                    isDragging={isEditDragging}
-                                    uploadProgress={editUploadProgress}
-                                    onDragEnter={handleEditDragEnter}
-                                    onDragLeave={handleEditDragLeave}
-                                    onDragOver={handleEditDragOver}
-                                    onDrop={handleEditDrop}
-                                    onFileSelect={handleEditImageChange}
-                                    onRemove={handleRemoveEditImage}
+                                    preview={editImagePreview} isDragging={isEditDragging} uploadProgress={editUploadProgress}
+                                    onDragEnter={handleEditDragEnter} onDragLeave={handleEditDragLeave}
+                                    onDragOver={handleEditDragOver} onDrop={handleEditDrop}
+                                    onFileSelect={handleEditImageChange} onRemove={handleRemoveEditImage}
                                     inputId="edit-image-upload"
                                 />
                                 {!editImagePreview && (
                                     <TextField
-                                        fullWidth
-                                        label="Görsel URL"
-                                        value={editingMusic.imageUrl || ''}
+                                        fullWidth label="Görsel URL" value={editingMusic.imageUrl || ''}
                                         onChange={(e) => setEditingMusic({ ...editingMusic, imageUrl: e.target.value })}
-                                        placeholder="https://example.com/image.jpg"
-                                        sx={{ mt: 2 }}
+                                        placeholder="https://example.com/image.jpg" sx={{ mt: 2 }}
                                     />
                                 )}
                             </Box>
 
                             <Divider />
 
-                            <TextField
-                                fullWidth
-                                label="Şarkı Adı"
-                                value={editingMusic.title || ''}
-                                onChange={(e) => setEditingMusic({ ...editingMusic, title: e.target.value })}
-                            />
+                            <TextField fullWidth label="Şarkı Adı" value={editingMusic.title || ''}
+                                       onChange={(e) => setEditingMusic({ ...editingMusic, title: e.target.value })} />
 
-                            {/* YENİ: Artist Multi-Select for Edit */}
                             <Box>
                                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                                     Artistler * (Birden fazla seçebilirsiniz)
@@ -1433,9 +1287,9 @@ const AddMusic = () => {
                                     label="Tür"
                                     onChange={(e) => setEditingMusic({ ...editingMusic, genre: e.target.value })}
                                 >
-                                    {genres.filter(g => g.value !== 'all').map(genre => (
-                                        <MenuItem key={genre.value} value={genre.value}>
-                                            {genre.icon} {genre.label}
+                                    {genres.map(genre => (
+                                        <MenuItem key={genre.slug} value={genre.slug}>
+                                            {genre.displayName}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -1445,17 +1299,13 @@ const AddMusic = () => {
 
                             {Object.entries(platformConfig).map(([key, config]) => (
                                 <TextField
-                                    key={key}
-                                    fullWidth
-                                    label={config.label}
+                                    key={key} fullWidth label={config.label}
                                     value={editingMusic.platformLinks?.[key] || ''}
                                     onChange={(e) => setEditingMusic({
                                         ...editingMusic,
                                         platformLinks: { ...editingMusic.platformLinks, [key]: e.target.value }
                                     })}
-                                    InputProps={{
-                                        startAdornment: <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box>
-                                    }}
+                                    InputProps={{ startAdornment: <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box> }}
                                 />
                             ))}
 
@@ -1466,28 +1316,15 @@ const AddMusic = () => {
                                         onChange={(e) => setEditingMusic({ ...editingMusic, isFeatured: e.target.checked })}
                                     />
                                 }
-                                label={
-                                    <Box display="flex" alignItems="center">
-                                        <StarIcon sx={{ mr: 1, color: 'warning.main' }} />
-                                        Öne Çıkan Müzik
-                                    </Box>
-                                }
+                                label={<Box display="flex" alignItems="center"><StarIcon sx={{ mr: 1, color: 'warning.main' }} />Öne Çıkan Müzik</Box>}
                             />
                         </Stack>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => {
-                        setOpenEditDialog(false);
-                        setEditImagePreview(null);
-                        setEditImageFile(null);
-                    }}>
-                        İptal
-                    </Button>
+                    <Button onClick={() => { setOpenEditDialog(false); setEditImagePreview(null); setEditImageFile(null); setEditArtistSearch(''); editImageDataRef.current = null; }}>İptal</Button>
                     <Button
-                        onClick={handleUpdateMusic}
-                        variant="contained"
-                        disabled={submitLoading}
+                        onClick={handleUpdateMusic} variant="contained" disabled={submitLoading}
                         startIcon={submitLoading ? <CircularProgress size={16} /> : <SaveIcon />}
                         sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}
                     >
@@ -1497,47 +1334,26 @@ const AddMusic = () => {
             </Dialog>
 
             {/* New Artist Dialog */}
-            <Dialog
-                open={showNewArtistDialog}
-                onClose={() => setShowNewArtistDialog(false)}
-                maxWidth="sm"
-                fullWidth
-            >
+            <Dialog open={showNewArtistDialog} onClose={() => setShowNewArtistDialog(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ bgcolor: '#7C3AED', color: '#fff' }}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <PersonAddIcon />
-                        Yeni Artist Oluştur
-                    </Box>
+                    <Box display="flex" alignItems="center" gap={1}><PersonAddIcon />Yeni Artist Oluştur</Box>
                 </DialogTitle>
                 <DialogContent sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                         Listede olmayan bir artist için hızlıca yeni profil oluşturun.
                     </Typography>
                     <TextField
-                        fullWidth
-                        label="Artist Adı *"
-                        value={newArtistName}
+                        fullWidth label="Artist Adı *" value={newArtistName}
                         onChange={(e) => setNewArtistName(e.target.value)}
-                        placeholder="Örn: Tarkan"
-                        sx={{ mt: 2 }}
-                        autoFocus
-                        onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                                handleCreateNewArtist(openEditDialog);
-                            }
-                        }}
+                        placeholder="Örn: Tarkan" sx={{ mt: 2 }} autoFocus
+                        onKeyPress={(e) => { if (e.key === 'Enter') handleCreateNewArtist(openEditDialog); }}
                     />
                     <Alert severity="info" sx={{ mt: 2 }}>
                         Oluşturulan artist otomatik olarak bu müziğe eklenecektir.
                     </Alert>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => {
-                        setShowNewArtistDialog(false);
-                        setNewArtistName('');
-                    }}>
-                        İptal
-                    </Button>
+                    <Button onClick={() => { setShowNewArtistDialog(false); setNewArtistName(''); }}>İptal</Button>
                     <Button
                         variant="contained"
                         onClick={() => handleCreateNewArtist(openEditDialog)}

@@ -37,7 +37,8 @@ import {
     Group,
     PlayCircle,
     MicExternalOn as ArtistIcon,
-    PlaylistAddCheck as ApprovalIcon
+    PlaylistAddCheck as ApprovalIcon,
+    Category as GenreIcon  // ✅ YENİ
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -59,6 +60,15 @@ const menuItems = [
         description: 'Müzik Ekleme ve Düzenleme'
     },
     {
+        id: 'genres',  // ✅ YENİ
+        title: 'Genre Yönetimi',
+        icon: <GenreIcon />,
+        path: '/admin/genres',
+        description: 'Kategori ve Resimler',
+        badge: 'NEW',
+        badgeColor: 'info'
+    },
+    {
         id: 'artists',
         title: 'Artist Yönetimi',
         icon: <ArtistIcon />,
@@ -66,7 +76,7 @@ const menuItems = [
         description: 'Sanatçı Profilleri',
         badge: null,
         badgeColor: 'warning',
-        dynamicBadge: true // Pending claims sayısını gösterecek
+        dynamicBadge: true
     },
     {
         id: 'artist-essential',
@@ -74,7 +84,7 @@ const menuItems = [
         icon: <ApprovalIcon />,
         path: '/admin/artist-essential',
         description: 'Playlist Onay',
-        badge: 'NEW',
+        badge: null,
         badgeColor: 'warning'
     },
     {
@@ -97,7 +107,7 @@ const menuItems = [
         icon: <StoreIcon />,
         path: '/admin/store',
         description: 'İlan ve Hak Yönetimi',
-        badge: 'NEW'
+        badge: null
     },
     {
         id: 'notifications',
@@ -113,7 +123,7 @@ const menuItems = [
         icon: <UsersIcon />,
         path: '/admin/users',
         description: 'Kullanıcı Yönetimi',
-        badge: 'NEW'
+        badge: null
     },
     {
         id: 'analytics',
@@ -253,7 +263,6 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
             </Box>
         </Box>
     );
-    // Part 1'den devam...
 
     // Navigation Menu
     const navigationMenu = (
@@ -351,7 +360,8 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                                 height: 16,
                                                 fontSize: '0.6rem',
                                                 fontWeight: 700,
-                                                backgroundColor: item.badgeColor === 'warning' ? '#ff9800' : '#000',
+                                                backgroundColor: item.badgeColor === 'warning' ? '#ff9800' :
+                                                    item.badgeColor === 'info' ? '#7C3AED' : '#000',
                                                 color: '#fff',
                                                 '& .MuiChip-label': {
                                                     px: 0.7

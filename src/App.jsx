@@ -13,7 +13,8 @@ import Notifications from "./pages/Notifications.jsx";
 import StoreManagement from "./pages/StoreManagement.jsx";
 import UserManagement from "./pages/UserManagement.jsx";
 import ArtistManagement from "./pages/ArtistManagement.jsx";
-import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx"; // YENİ EKLENEN
+import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx";
+import GenreManagement from "./pages/GenreManagement.jsx";  // ✅ YENİ EKLENEN
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -151,13 +152,14 @@ function App() {
 
                             {/* Admin Panel Routes */}
                             <Route path="admin/music" element={<AddMusic />} />
+                            <Route path="admin/genres" element={<GenreManagement />} />  {/* ✅ YENİ */}
                             <Route path="admin/playlists" element={<Playlists />} />
                             <Route path="admin/samples" element={<SampleBank />} />
                             <Route path="admin/store" element={<StoreManagement />} />
                             <Route path="admin/notifications" element={<Notifications />} />
                             <Route path="admin/users" element={<UserManagement />} />
                             <Route path="admin/artists" element={<ArtistManagement />} />
-                            <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} /> {/* YENİ */}
+                            <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
                             <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
                                 <h2>Analytics</h2>
                                 <p>Analytics sayfası yakında...</p>
@@ -176,7 +178,8 @@ function App() {
                             <Route path="playlists" element={<Playlists />} />
                             <Route path="store" element={<StoreManagement />} />
                             <Route path="users" element={<UserManagement />} />
-                            <Route path="artist-essential" element={<ArtistEssentialApproval />} /> {/* Legacy */}
+                            <Route path="genres" element={<GenreManagement />} />  {/* ✅ Legacy */}
+                            <Route path="artist-essential" element={<ArtistEssentialApproval />} />
 
                             <Route path="settings" element={<div style={{ padding: '24px' }}>
                                 <h2>Ayarlar</h2>

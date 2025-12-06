@@ -45,7 +45,7 @@ const Notifications = () => {
     });
 
     // Backend API ayarları
-    const API_BASE = 'http://localhost:5000/api';
+    const API_BASE = 'http://192.168.1.3:5000/api';
 
     const getAuthToken = () => {
         const token = localStorage.getItem('adminToken');
