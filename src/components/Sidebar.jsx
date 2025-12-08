@@ -38,12 +38,14 @@ import {
     PlayCircle,
     MicExternalOn as ArtistIcon,
     PlaylistAddCheck as ApprovalIcon,
-    Category as GenreIcon  // ✅ YENİ
+    Category as GenreIcon,
+    CardMembership as SubscriptionIcon,  // ✅ YENİ
+    Star as PremiumIcon  // ✅ YENİ
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
 
-// Menu items configuration
+// Menu items configuration - ✅ SUBSCRIPTIONS EKLENDİ
 const menuItems = [
     {
         id: 'dashboard',
@@ -60,12 +62,12 @@ const menuItems = [
         description: 'Müzik Ekleme ve Düzenleme'
     },
     {
-        id: 'genres',  // ✅ YENİ
+        id: 'genres',
         title: 'Genre Yönetimi',
         icon: <GenreIcon />,
         path: '/admin/genres',
         description: 'Kategori ve Resimler',
-        badge: 'NEW',
+        badge: null,
         badgeColor: 'info'
     },
     {
@@ -109,6 +111,16 @@ const menuItems = [
         description: 'İlan ve Hak Yönetimi',
         badge: null
     },
+    // ✅ YENİ: Abonelik Yönetimi
+    {
+        id: 'subscriptions',
+        title: 'Abonelikler',
+        icon: <SubscriptionIcon />,
+        path: '/admin/subscriptions',
+        description: 'Trial & Premium Yönetimi',
+        badge: 'NEW',
+        badgeColor: 'success'
+    },
     {
         id: 'notifications',
         title: 'Bildirimler',
@@ -141,12 +153,12 @@ const menuItems = [
     }
 ];
 
-// Quick stats configuration
+// Quick stats configuration - ✅ PREMIUM EKLENDİ
 const quickStats = [
     { icon: <MusicNote />, label: 'Müzik', value: '1,247', trend: '+12%', color: '#4caf50' },
     { icon: <PlaylistIcon />, label: 'Playlist', value: '45', trend: '+5%', color: '#4caf50' },
     { icon: <Group />, label: 'Kullanıcı', value: '2.1K', trend: '+18%', color: '#4caf50' },
-    { icon: <PlayCircle />, label: 'Dinlenme', value: '15.2K', trend: '+25%', color: '#4caf50' }
+    { icon: <PremiumIcon />, label: 'Premium', value: '456', trend: '+25%', color: '#FFD700' }  // ✅ GÜNCELLENDİ
 ];
 
 export default function AdminSidebar({ currentPath, onNavigate }) {
@@ -247,7 +259,7 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                     </Typography>
                 </Box>
                 <Chip
-                    label="v1.0.0"
+                    label="v1.1.0"
                     size="small"
                     sx={{
                         height: 18,
@@ -300,14 +312,14 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                 transform: 'translateY(-50%)',
                                 width: 3,
                                 height: currentPath === item.path ? '60%' : 0,
-                                backgroundColor: '#000',
+                                backgroundColor: item.id === 'subscriptions' ? '#10B981' : '#000',  // ✅ Subscription için yeşil
                                 borderRadius: '0 2px 2px 0',
                                 transition: 'height 0.2s ease'
                             },
                             '&.Mui-selected': {
-                                backgroundColor: '#f5f5f5',
+                                backgroundColor: item.id === 'subscriptions' ? '#10B98110' : '#f5f5f5',  // ✅ Subscription için yeşil ton
                                 '&:hover': {
-                                    backgroundColor: '#efefef'
+                                    backgroundColor: item.id === 'subscriptions' ? '#10B98120' : '#efefef'
                                 }
                             },
                             '&:hover:not(.Mui-selected)': {
@@ -316,7 +328,9 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                         }}
                     >
                         <ListItemIcon sx={{
-                            color: currentPath === item.path ? '#000' : '#666',
+                            color: currentPath === item.path
+                                ? (item.id === 'subscriptions' ? '#10B981' : '#000')  // ✅ Subscription için yeşil
+                                : '#666',
                             minWidth: 36
                         }}>
                             <Badge
@@ -346,7 +360,9 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                         sx={{
                                             fontWeight: currentPath === item.path ? 700 : 500,
                                             fontSize: '0.85rem',
-                                            color: currentPath === item.path ? '#000' : '#333',
+                                            color: currentPath === item.path
+                                                ? (item.id === 'subscriptions' ? '#10B981' : '#000')  // ✅ Subscription için yeşil
+                                                : '#333',
                                             letterSpacing: '0.01em'
                                         }}
                                     >
@@ -361,7 +377,8 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                                 fontSize: '0.6rem',
                                                 fontWeight: 700,
                                                 backgroundColor: item.badgeColor === 'warning' ? '#ff9800' :
-                                                    item.badgeColor === 'info' ? '#7C3AED' : '#000',
+                                                    item.badgeColor === 'info' ? '#7C3AED' :
+                                                        item.badgeColor === 'success' ? '#10B981' : '#000',  // ✅ success rengi
                                                 color: '#fff',
                                                 '& .MuiChip-label': {
                                                     px: 0.7
@@ -432,7 +449,7 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                     mb: 0.5
                                 }}>
                                     <Box sx={{
-                                        color: '#999',
+                                        color: stat.label === 'Premium' ? '#FFD700' : '#999',  // ✅ Premium için altın rengi
                                         '& svg': { fontSize: 14 }
                                     }}>
                                         {stat.icon}
@@ -454,7 +471,7 @@ export default function AdminSidebar({ currentPath, onNavigate }) {
                                     sx={{
                                         fontSize: '0.95rem',
                                         fontWeight: 800,
-                                        color: '#000',
+                                        color: stat.label === 'Premium' ? '#FFD700' : '#000',  // ✅ Premium için altın rengi
                                         lineHeight: 1
                                     }}
                                 >

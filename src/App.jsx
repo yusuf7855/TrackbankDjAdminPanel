@@ -14,7 +14,8 @@ import StoreManagement from "./pages/StoreManagement.jsx";
 import UserManagement from "./pages/UserManagement.jsx";
 import ArtistManagement from "./pages/ArtistManagement.jsx";
 import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx";
-import GenreManagement from "./pages/GenreManagement.jsx";  // ✅ YENİ EKLENEN
+import GenreManagement from "./pages/GenreManagement.jsx";
+import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";  // ✅ YENİ EKLENEN
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -152,7 +153,7 @@ function App() {
 
                             {/* Admin Panel Routes */}
                             <Route path="admin/music" element={<AddMusic />} />
-                            <Route path="admin/genres" element={<GenreManagement />} />  {/* ✅ YENİ */}
+                            <Route path="admin/genres" element={<GenreManagement />} />
                             <Route path="admin/playlists" element={<Playlists />} />
                             <Route path="admin/samples" element={<SampleBank />} />
                             <Route path="admin/store" element={<StoreManagement />} />
@@ -160,6 +161,7 @@ function App() {
                             <Route path="admin/users" element={<UserManagement />} />
                             <Route path="admin/artists" element={<ArtistManagement />} />
                             <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
+                            <Route path="admin/subscriptions" element={<SubscriptionManagement />} />  {/* ✅ YENİ */}
                             <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
                                 <h2>Analytics</h2>
                                 <p>Analytics sayfası yakında...</p>
@@ -178,7 +180,8 @@ function App() {
                             <Route path="playlists" element={<Playlists />} />
                             <Route path="store" element={<StoreManagement />} />
                             <Route path="users" element={<UserManagement />} />
-                            <Route path="genres" element={<GenreManagement />} />  {/* ✅ Legacy */}
+                            <Route path="genres" element={<GenreManagement />} />
+                            <Route path="subscriptions" element={<SubscriptionManagement />} />  {/* ✅ Legacy */}
                             <Route path="artist-essential" element={<ArtistEssentialApproval />} />
 
                             <Route path="settings" element={<div style={{ padding: '24px' }}>

@@ -47,7 +47,7 @@ const Topbar = ({ onMenuClick }) => {
         setNotificationAnchor(null);
     };
 
-    // Sayfa başlığını al
+    // Sayfa başlığını al - ✅ SUBSCRIPTIONS EKLENDİ
     const getPageTitle = () => {
         const path = location.pathname;
         const titles = {
@@ -60,19 +60,22 @@ const Topbar = ({ onMenuClick }) => {
             '/admin/users': 'Kullanıcı Yönetimi',
             '/admin/artists': 'Artist Yönetimi',
             '/admin/artist-essential': 'Artist Essential',
-            '/admin/genres': 'Genre Yönetimi',  // ✅ YENİ
+            '/admin/genres': 'Genre Yönetimi',
+            '/admin/subscriptions': 'Abonelik Yönetimi',  // ✅ YENİ
             '/admin/analytics': 'Analytics',
             '/admin/settings': 'Ayarlar'
         };
         return titles[path] || 'Admin Panel';
     };
 
-    // Mock notifications
+    // Mock notifications - ✅ SUBSCRIPTION BİLDİRİMİ EKLENDİ
     const notifications = [
         { id: 1, title: 'Yeni müzik eklendi', time: '2 dakika önce', read: false },
         { id: 2, title: 'Sistem güncellendi', time: '1 saat önce', read: false },
         { id: 3, title: 'Yeni kullanıcı kaydı', time: '3 saat önce', read: true },
-        { id: 4, title: 'Playlist onaylandı', time: '5 saat önce', read: true }
+        { id: 4, title: 'Playlist onaylandı', time: '5 saat önce', read: true },
+        { id: 5, title: '12 trial süresi dolmak üzere', time: '6 saat önce', read: false },  // ✅ YENİ
+        { id: 6, title: '5 yeni premium abonelik', time: '1 gün önce', read: true }  // ✅ YENİ
     ];
 
     const unreadCount = notifications.filter(n => !n.read).length;

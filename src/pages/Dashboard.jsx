@@ -1,4 +1,4 @@
-// Dashboard.jsx - ARTIST SİSTEMİ EKLENMİŞ VERSİYON
+// Dashboard.jsx - ARTIST SİSTEMİ + SUBSCRIPTION SİSTEMİ EKLENMİŞ VERSİYON
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -56,7 +56,12 @@ import {
     VerifiedUser as VerifiedIcon,
     PersonAdd as PersonAddIcon,
     HowToReg as ClaimIcon,
-    MicExternalOn as ArtistIcon
+    MicExternalOn as ArtistIcon,
+    CardMembership as SubscriptionIcon,  // ✅ YENİ
+    Timer as TrialIcon,  // ✅ YENİ
+    Warning as WarningIcon,  // ✅ YENİ
+    CheckCircle as ActiveIcon,  // ✅ YENİ
+    Cancel as ExpiredIcon  // ✅ YENİ
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -92,7 +97,6 @@ const Dashboard = () => {
             user: 0,
             withCovers: 0
         },
-        // YENİ: Artist istatistikleri
         artists: {
             total: 0,
             claimed: 0,
@@ -106,6 +110,19 @@ const Dashboard = () => {
             premium: 0,
             newToday: 0,
             verifiedArtists: 0
+        },
+        // ✅ YENİ: Subscription İstatistikleri
+        subscriptions: {
+            totalPremium: 0,
+            activeTrial: 0,
+            expiredTrial: 0,
+            monthly: 0,
+            yearly: 0,
+            lifetime: 0,
+            adminGranted: 0,
+            expiringSoon: 0,  // 3 gün içinde dolacak
+            newThisMonth: 0,
+            conversionRate: 0  // Trial -> Premium dönüşüm oranı
         },
         store: {
             totalListings: 0,
@@ -190,17 +207,20 @@ const Dashboard = () => {
             setError(null);
 
             // Fetch real data from API
-            const [musicRes, playlistsRes, artistsRes, pendingClaimsRes] = await Promise.all([
+            const [musicRes, playlistsRes, artistsRes, pendingClaimsRes, subscriptionStatsRes] = await Promise.all([
                 axios.get(`${API_BASE_URL}/music`).catch(() => ({ data: { data: { musics: [] } } })),
                 axios.get(`${API_BASE_URL}/playlists/admin`).catch(() => ({ data: { data: { playlists: [] } } })),
                 axios.get(`${API_BASE_URL}/artists`).catch(() => ({ data: { data: { artists: [] } } })),
-                axios.get(`${API_BASE_URL}/artists/claims/pending`).catch(() => ({ data: { data: { claims: [] } } }))
+                axios.get(`${API_BASE_URL}/artists/claims/pending`).catch(() => ({ data: { data: { claims: [] } } })),
+                // ✅ YENİ: Subscription stats API
+                axios.get(`${API_BASE_URL}/admin/subscriptions/stats`).catch(() => ({ data: { data: null } }))
             ]);
 
             const musicData = musicRes.data?.data?.musics || musicRes.data?.musics || musicRes.data?.music || [];
             const playlistData = playlistsRes.data?.data?.playlists || playlistsRes.data?.playlists || [];
             const artistData = artistsRes.data?.data?.artists || artistsRes.data?.artists || [];
             const pendingClaims = pendingClaimsRes.data?.data?.claims || pendingClaimsRes.data?.claims || [];
+            const subscriptionData = subscriptionStatsRes.data?.data || subscriptionStatsRes.data?.stats || null;
 
             // Calculate music stats
             const musicStats = {
@@ -234,13 +254,39 @@ const Dashboard = () => {
                 withCovers: playlistData.filter(p => p.coverImage).length
             };
 
-            // YENİ: Calculate artist stats
+            // Calculate artist stats
             const artistStats = {
                 total: artistData.length,
                 claimed: artistData.filter(a => a.claimStatus === 'claimed').length,
                 unclaimed: artistData.filter(a => a.claimStatus === 'unclaimed').length,
                 pendingClaims: pendingClaims.length,
                 verified: artistData.filter(a => a.isVerified).length
+            };
+
+            // ✅ YENİ: Subscription stats (API'den geliyorsa kullan, yoksa mock data)
+            const subscriptionStats = subscriptionData ? {
+                totalPremium: subscriptionData.premium || 0,
+                activeTrial: subscriptionData.activeTrial || 0,
+                expiredTrial: subscriptionData.expiredTrial || 0,
+                monthly: subscriptionData.monthly || 0,
+                yearly: subscriptionData.yearly || 0,
+                lifetime: subscriptionData.lifetime || 0,
+                adminGranted: subscriptionData.adminGranted || 0,
+                expiringSoon: subscriptionData.expiringSoon || 0,
+                newThisMonth: subscriptionData.newThisMonth || 0,
+                conversionRate: subscriptionData.conversionRate || 0
+            } : {
+                // Mock data - API hazır değilse
+                totalPremium: 456,
+                activeTrial: 89,
+                expiredTrial: 234,
+                monthly: 312,
+                yearly: 98,
+                lifetime: 12,
+                adminGranted: 34,
+                expiringSoon: 23,
+                newThisMonth: 67,
+                conversionRate: 28.5
             };
 
             // Top genres
@@ -264,10 +310,11 @@ const Dashboard = () => {
                 platformLinks: platformStats,
                 playlists: playlistStats,
                 artists: artistStats,
+                subscriptions: subscriptionStats,  // ✅ YENİ
                 users: {
                     total: 2847,
                     active: 1892,
-                    premium: 456,
+                    premium: subscriptionStats.totalPremium,  // ✅ GÜNCELLENDİ
                     newToday: 23,
                     verifiedArtists: artistStats.claimed
                 },
@@ -287,13 +334,14 @@ const Dashboard = () => {
             setTopGenres(genreData);
             setRecentArtists(sortedArtists);
 
-            // Activity data
+            // Activity data - ✅ SUBSCRIPTION AKTİVİTELERİ EKLENDİ
             const mockActivity = [
                 { id: 1, activity: 'Yeni müzik eklendi', user: 'Admin', type: 'music', time: '2 dakika önce' },
-                { id: 2, activity: 'Yeni artist oluşturuldu', user: 'Admin', type: 'artist', time: '5 dakika önce' },
-                { id: 3, activity: 'Claim başvurusu alındı', user: 'User_123', type: 'claim', time: '10 dakika önce' },
-                { id: 4, activity: 'Admin playlist oluşturuldu', user: 'Admin', type: 'playlist', time: '15 dakika önce' },
-                { id: 5, activity: 'Artist profili güncellendi', user: 'Admin', type: 'artist', time: '20 dakika önce' }
+                { id: 2, activity: 'Yeni premium abonelik', user: 'user_456', type: 'subscription', time: '5 dakika önce' },  // ✅ YENİ
+                { id: 3, activity: 'Trial başlatıldı', user: 'user_789', type: 'trial', time: '8 dakika önce' },  // ✅ YENİ
+                { id: 4, activity: 'Yeni artist oluşturuldu', user: 'Admin', type: 'artist', time: '10 dakika önce' },
+                { id: 5, activity: 'Claim başvurusu alındı', user: 'User_123', type: 'claim', time: '15 dakika önce' },
+                { id: 6, activity: 'Admin abonelik verdi', user: 'Admin', type: 'admin_grant', time: '20 dakika önce' }  // ✅ YENİ
             ];
 
             setRecentActivity(mockActivity);
@@ -316,6 +364,12 @@ const Dashboard = () => {
     const getClaimRate = () => {
         if (stats.artists.total === 0) return 0;
         return ((stats.artists.claimed / stats.artists.total) * 100).toFixed(1);
+    };
+
+    // ✅ YENİ: Premium oranı hesapla
+    const getPremiumRate = () => {
+        if (stats.users.total === 0) return 0;
+        return ((stats.subscriptions.totalPremium / stats.users.total) * 100).toFixed(1);
     };
 
     if (loading) {
@@ -347,7 +401,7 @@ const Dashboard = () => {
                             TrackBang Dashboard
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Music Management • Artist System • 5 Platform Support
+                            Music Management • Artist System • Subscriptions • 5 Platform Support
                         </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -364,6 +418,21 @@ const Dashboard = () => {
                                     '&:hover': { bgcolor: '#F57C00' }
                                 }}
                                 onClick={() => navigate('/admin/artists')}
+                            />
+                        )}
+                        {/* ✅ YENİ: Expiring Soon Alert */}
+                        {stats.subscriptions.expiringSoon > 0 && (
+                            <Chip
+                                icon={<WarningIcon />}
+                                label={`${stats.subscriptions.expiringSoon} Abonelik Dolacak`}
+                                sx={{
+                                    bgcolor: '#EF4444',
+                                    color: '#fff',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    '&:hover': { bgcolor: '#DC2626' }
+                                }}
+                                onClick={() => navigate('/admin/subscriptions')}
                             />
                         )}
                         <Chip
@@ -467,7 +536,7 @@ const Dashboard = () => {
                     </Fade>
                 </Grid>
 
-                {/* YENİ: Artists Card */}
+                {/* Artists Card */}
                 <Grid item xs={12} sm={6} md={3}>
                     <Grow in timeout={1100}>
                         <Card sx={{
@@ -525,7 +594,7 @@ const Dashboard = () => {
                     </Grow>
                 </Grid>
 
-                {/* Playlists */}
+                {/* ✅ YENİ: Subscriptions Card */}
                 <Grid item xs={12} sm={6} md={3}>
                     <Grow in timeout={1200}>
                         <Card sx={{
@@ -539,41 +608,44 @@ const Dashboard = () => {
                                 boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
                             }
                         }}
-                              onClick={() => navigate('/admin/playlists')}
+                              onClick={() => navigate('/admin/subscriptions')}
                         >
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Avatar sx={{ bgcolor: '#424242', mr: 2, width: 56, height: 56 }}>
-                                        <PlaylistIcon />
+                                    <Avatar sx={{ bgcolor: '#10B981', mr: 2, width: 56, height: 56 }}>
+                                        <SubscriptionIcon />
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="h4" fontWeight="bold" color="#424242">
-                                            {stats.playlists.total}
+                                        <Typography variant="h4" fontWeight="bold" color="#10B981">
+                                            {stats.subscriptions.totalPremium}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            Toplam Playlist
+                                            Premium Üye
                                         </Typography>
                                     </Box>
                                 </Box>
                                 <Stack spacing={1}>
                                     <Stack direction="row" spacing={1}>
                                         <Chip
-                                            label={`Admin: ${stats.playlists.admin}`}
+                                            icon={<TrialIcon />}
+                                            label={`Trial: ${stats.subscriptions.activeTrial}`}
                                             size="small"
-                                            sx={{ bgcolor: '#000', color: '#fff' }}
+                                            sx={{ bgcolor: '#3B82F6', color: '#fff' }}
                                         />
                                         <Chip
-                                            label={`User: ${stats.playlists.user}`}
+                                            label={`+${stats.subscriptions.newThisMonth} bu ay`}
                                             size="small"
-                                            sx={{ bgcolor: '#616161', color: '#fff' }}
+                                            sx={{ bgcolor: '#10B981', color: '#fff' }}
                                         />
                                     </Stack>
-                                    <Box display="flex" alignItems="center" gap={0.5}>
-                                        <ImageIcon sx={{ fontSize: 14, color: '#000' }} />
-                                        <Typography variant="caption" color="text.secondary">
-                                            {stats.playlists.withCovers} cover görselli
-                                        </Typography>
-                                    </Box>
+                                    {stats.subscriptions.expiringSoon > 0 && (
+                                        <Chip
+                                            icon={<WarningIcon />}
+                                            label={`${stats.subscriptions.expiringSoon} Dolacak`}
+                                            size="small"
+                                            sx={{ bgcolor: '#EF4444', color: '#fff' }}
+                                        />
+                                    )}
                                 </Stack>
                             </CardContent>
                         </Card>
@@ -620,7 +692,7 @@ const Dashboard = () => {
                                         <Chip
                                             label={`Premium: ${stats.users.premium}`}
                                             size="small"
-                                            sx={{ bgcolor: '#424242', color: '#fff' }}
+                                            sx={{ bgcolor: '#10B981', color: '#fff' }}
                                         />
                                     </Stack>
                                     <Box display="flex" alignItems="center" gap={0.5}>
@@ -636,10 +708,194 @@ const Dashboard = () => {
                 </Grid>
             </Grid>
 
-            {/* Artist Stats Section - YENİ */}
+            {/* ✅ YENİ: Subscription Stats Section */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12}>
                     <Fade in timeout={1500}>
+                        <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        <Avatar sx={{ bgcolor: '#10B981', mr: 2 }}>
+                                            <SubscriptionIcon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h6" fontWeight="bold">
+                                                Abonelik Yönetimi
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Trial, Premium ve Admin verilen abonelikler
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<SubscriptionIcon />}
+                                        onClick={() => navigate('/admin/subscriptions')}
+                                        sx={{
+                                            bgcolor: '#10B981',
+                                            '&:hover': { bgcolor: '#059669' }
+                                        }}
+                                    >
+                                        Abonelik Yönetimi
+                                    </Button>
+                                </Box>
+
+                                <Grid container spacing={3}>
+                                    {/* Total Premium */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#D1FAE5', borderRadius: 2 }}>
+                                            <ActiveIcon sx={{ fontSize: 32, color: '#10B981', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#10B981">
+                                                {stats.subscriptions.totalPremium}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Toplam Premium
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Active Trial */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#DBEAFE', borderRadius: 2 }}>
+                                            <TrialIcon sx={{ fontSize: 32, color: '#3B82F6', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#3B82F6">
+                                                {stats.subscriptions.activeTrial}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Aktif Trial
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Monthly */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#F3F4F6', borderRadius: 2 }}>
+                                            <SubscriptionIcon sx={{ fontSize: 32, color: '#6B7280', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#6B7280">
+                                                {stats.subscriptions.monthly}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Aylık
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Yearly */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#FEF3C7', borderRadius: 2 }}>
+                                            <StarIcon sx={{ fontSize: 32, color: '#F59E0B', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#F59E0B">
+                                                {stats.subscriptions.yearly}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Yıllık
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Admin Granted */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#EDE9FE', borderRadius: 2 }}>
+                                            <VerifiedIcon sx={{ fontSize: 32, color: '#7C3AED', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color="#7C3AED">
+                                                {stats.subscriptions.adminGranted}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Admin Verdi
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Expiring Soon */}
+                                    <Grid item xs={6} sm={4} md={2}>
+                                        <Box
+                                            sx={{
+                                                textAlign: 'center',
+                                                p: 2,
+                                                bgcolor: stats.subscriptions.expiringSoon > 0 ? '#FEE2E2' : '#F3F4F6',
+                                                borderRadius: 2,
+                                                cursor: stats.subscriptions.expiringSoon > 0 ? 'pointer' : 'default',
+                                                transition: 'all 0.2s',
+                                                '&:hover': stats.subscriptions.expiringSoon > 0 ? {
+                                                    bgcolor: '#FECACA',
+                                                    transform: 'scale(1.02)'
+                                                } : {}
+                                            }}
+                                            onClick={() => stats.subscriptions.expiringSoon > 0 && navigate('/admin/subscriptions?status=expiring')}
+                                        >
+                                            <WarningIcon sx={{ fontSize: 32, color: stats.subscriptions.expiringSoon > 0 ? '#EF4444' : '#9CA3AF', mb: 1 }} />
+                                            <Typography variant="h4" fontWeight="bold" color={stats.subscriptions.expiringSoon > 0 ? '#EF4444' : '#9CA3AF'}>
+                                                {stats.subscriptions.expiringSoon}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                3 Gün İçinde Dolacak
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+
+                                {/* Conversion Rate & Premium Rate Progress */}
+                                <Grid container spacing={3} sx={{ mt: 2 }}>
+                                    <Grid item xs={12} md={6}>
+                                        <Box>
+                                            <Box display="flex" justifyContent="space-between" mb={1}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Trial → Premium Dönüşüm Oranı
+                                                </Typography>
+                                                <Typography variant="body2" fontWeight="bold" color="#10B981">
+                                                    %{stats.subscriptions.conversionRate}
+                                                </Typography>
+                                            </Box>
+                                            <LinearProgress
+                                                variant="determinate"
+                                                value={stats.subscriptions.conversionRate}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    height: 10,
+                                                    bgcolor: '#E5E7EB',
+                                                    '& .MuiLinearProgress-bar': {
+                                                        bgcolor: '#10B981'
+                                                    }
+                                                }}
+                                            />
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <Box>
+                                            <Box display="flex" justifyContent="space-between" mb={1}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Toplam Premium Oranı
+                                                </Typography>
+                                                <Typography variant="body2" fontWeight="bold" color="#3B82F6">
+                                                    %{getPremiumRate()}
+                                                </Typography>
+                                            </Box>
+                                            <LinearProgress
+                                                variant="determinate"
+                                                value={parseFloat(getPremiumRate())}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    height: 10,
+                                                    bgcolor: '#E5E7EB',
+                                                    '& .MuiLinearProgress-bar': {
+                                                        bgcolor: '#3B82F6'
+                                                    }
+                                                }}
+                                            />
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </CardContent>
+                        </Card>
+                    </Fade>
+                </Grid>
+            </Grid>
+
+            {/* Artist Stats Section */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12}>
+                    <Fade in timeout={1600}>
                         <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
@@ -979,6 +1235,24 @@ const Dashboard = () => {
                                     >
                                         Yeni Artist Ekle
                                     </Button>
+                                    {/* ✅ YENİ: Subscription Quick Action */}
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<SubscriptionIcon />}
+                                        fullWidth
+                                        size="large"
+                                        onClick={() => navigate('/admin/subscriptions')}
+                                        sx={{
+                                            justifyContent: 'flex-start',
+                                            bgcolor: '#10B981',
+                                            color: '#fff',
+                                            '&:hover': {
+                                                bgcolor: '#059669'
+                                            }
+                                        }}
+                                    >
+                                        Abonelik Yönetimi
+                                    </Button>
                                     <Button
                                         variant="outlined"
                                         startIcon={<PlaylistIcon />}
@@ -1091,7 +1365,10 @@ const Dashboard = () => {
                                                             bgcolor: activity.type === 'music' ? '#000' :
                                                                 activity.type === 'playlist' ? '#424242' :
                                                                     activity.type === 'artist' ? '#7C3AED' :
-                                                                        activity.type === 'claim' ? '#F59E0B' : '#757575',
+                                                                        activity.type === 'claim' ? '#F59E0B' :
+                                                                            activity.type === 'subscription' ? '#10B981' :
+                                                                                activity.type === 'trial' ? '#3B82F6' :
+                                                                                    activity.type === 'admin_grant' ? '#8B5CF6' : '#757575',
                                                             color: '#fff'
                                                         }}
                                                     />
@@ -1106,7 +1383,7 @@ const Dashboard = () => {
                     </Fade>
                 </Grid>
 
-                {/* Recent Artists - YENİ */}
+                {/* Recent Artists */}
                 <Grid item xs={12} lg={6}>
                     <Fade in timeout={2800}>
                         <Paper sx={{ p: 3, bgcolor: '#fff', border: '1px solid #e0e0e0' }}>

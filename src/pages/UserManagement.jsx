@@ -1,4 +1,5 @@
-// src/pages/UserManagement.jsx - KULLANICI YÖNETİMİ (SADECE STANDART KULLANICILAR)
+// src/pages/UserManagement.jsx - KULLANICI YÖNETİMİ + ABONELİK YÖNETİMİ
+// ✅ YENİ: Abonelik durumu görüntüleme, trial/premium yönetimi, süre uzatma
 // NOT: Trackbang rozetli artistler burada GÖRÜNMEYECEK - onlar ArtistManagement'ta
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -37,7 +38,8 @@ import {
     InputAdornment,
     Switch,
     FormControlLabel,
-    Collapse
+    Collapse,
+    LinearProgress
 } from '@mui/material';
 import {
     Edit as EditIcon,
@@ -61,7 +63,23 @@ import {
     Email as EmailIcon,
     Phone as PhoneIcon,
     Group as GroupIcon,
-    Badge as BadgeIcon
+    Badge as BadgeIcon,
+    // ✅ YENİ: Subscription iconları
+    CardMembership as SubscriptionIcon,
+    Timer as TrialIcon,
+    Star as PremiumIcon,
+    Warning as WarningIcon,
+    Cancel as CancelIcon,
+    AddCircle as AddIcon,
+    Extension as ExtendIcon,
+    History as HistoryIcon,
+    PlayArrow as StartIcon,
+    Replay as ResetIcon,
+    Block as RevokeIcon,
+    CardGiftcard as GiftIcon,
+    CalendarToday as CalendarIcon,
+    AccessTime as TimeIcon,
+    TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -74,6 +92,27 @@ const badges = {
     none: { label: 'Rozet Yok', icon: null, color: '#9e9e9e' }
 };
 
+// ✅ YENİ: Subscription Status Tanımları
+const subscriptionStatuses = {
+    new_user: { label: 'Yeni Üye', color: '#9CA3AF', bgColor: '#F3F4F6', icon: PersonIcon },
+    trial_active: { label: 'Trial Aktif', color: '#3B82F6', bgColor: '#DBEAFE', icon: TrialIcon },
+    trial_expired: { label: 'Trial Doldu', color: '#F59E0B', bgColor: '#FEF3C7', icon: WarningIcon },
+    subscribed: { label: 'Premium', color: '#10B981', bgColor: '#D1FAE5', icon: PremiumIcon },
+    admin_granted: { label: 'Admin Verdi', color: '#8B5CF6', bgColor: '#EDE9FE', icon: GiftIcon },
+    expired: { label: 'Süresi Doldu', color: '#EF4444', bgColor: '#FEE2E2', icon: CancelIcon }
+};
+
+// ✅ YENİ: Subscription Type Tanımları
+const subscriptionTypes = {
+    free: { label: 'Ücretsiz', color: '#9CA3AF' },
+    trial: { label: 'Deneme', color: '#3B82F6' },
+    monthly: { label: 'Aylık', color: '#10B981' },
+    yearly: { label: 'Yıllık', color: '#F59E0B' },
+    lifetime: { label: 'Ömür Boyu', color: '#8B5CF6' },
+    admin_granted: { label: 'Admin Verdi', color: '#7C3AED' },
+    premium: { label: 'Premium', color: '#10B981' }
+};
+
 const UserManagement = () => {
     // Users state
     const [users, setUsers] = useState([]);
@@ -84,6 +123,7 @@ const UserManagement = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [subscriptionFilter, setSubscriptionFilter] = useState('');  // ✅ YENİ
     const [showFilters, setShowFilters] = useState(false);
 
     // Dialog states
@@ -91,6 +131,19 @@ const UserManagement = () => {
     const [deleteDialog, setDeleteDialog] = useState({ open: false, user: null });
     const [passwordDialog, setPasswordDialog] = useState({ open: false, user: null, mode: 'reset' });
     const [passwordResultDialog, setPasswordResultDialog] = useState({ open: false, data: null });
+
+    // ✅ YENİ: Subscription Dialog States
+    const [subscriptionDialog, setSubscriptionDialog] = useState({ open: false, user: null, action: null });
+    const [subscriptionHistoryDialog, setSubscriptionHistoryDialog] = useState({ open: false, user: null, history: [] });
+    const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+
+    // ✅ YENİ: Subscription Form State
+    const [subscriptionFormData, setSubscriptionFormData] = useState({
+        type: 'admin_granted',
+        duration: 30,
+        reason: '',
+        days: 7
+    });
 
     // Password form state
     const [newPassword, setNewPassword] = useState('');
@@ -117,11 +170,14 @@ const UserManagement = () => {
         severity: 'success'
     });
 
-    // Stats
+    // Stats - ✅ GÜNCELLENDİ: Subscription stats eklendi
     const [stats, setStats] = useState({
         totalUsers: 0,
         activeUsers: 0,
-        adminUsers: 0
+        adminUsers: 0,
+        premiumUsers: 0,
+        trialUsers: 0,
+        expiredTrialUsers: 0
     });
 
     // ========== SNACKBAR ==========
@@ -139,6 +195,7 @@ const UserManagement = () => {
                 search: searchQuery || undefined,
                 role: roleFilter || undefined,
                 status: statusFilter || undefined,
+                subscriptionStatus: subscriptionFilter || undefined,
                 excludeBadge: 'trackbang'
             };
 
@@ -157,7 +214,7 @@ const UserManagement = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, rowsPerPage, searchQuery, roleFilter, statusFilter]);
+    }, [page, rowsPerPage, searchQuery, roleFilter, statusFilter, subscriptionFilter]);
 
     const loadStats = useCallback(async () => {
         try {
@@ -175,10 +232,148 @@ const UserManagement = () => {
         loadStats();
     }, [loadUsers, loadStats]);
 
-    // ========== HANDLERS ==========
+    // ========== HELPER FUNCTIONS ==========
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         showSnackbar('Panoya kopyalandı', 'success');
+    };
+
+    // ✅ YENİ: Kalan gün hesapla
+    const calculateDaysRemaining = (user) => {
+        if (!user.subscription) return 0;
+
+        const now = new Date();
+        let endDate = null;
+
+        // Trial kontrolü
+        if (user.subscription.type === 'trial' && user.subscription.trialEndDate) {
+            endDate = new Date(user.subscription.trialEndDate);
+        }
+        // Normal abonelik
+        else if (user.subscription.endDate) {
+            endDate = new Date(user.subscription.endDate);
+        }
+
+        if (!endDate) return 0;
+
+        const diffTime = endDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 0;
+    };
+
+    // ✅ YENİ: Subscription durumu belirle
+    const getSubscriptionStatus = (user) => {
+        if (!user.subscription) return 'new_user';
+
+        const now = new Date();
+        const sub = user.subscription;
+
+        // Admin tarafından verilmiş ve aktif
+        if (sub.grantedByAdmin && sub.isActive) {
+            if (!sub.endDate || new Date(sub.endDate) > now) {
+                return 'admin_granted';
+            }
+        }
+
+        // Trial kullanılmamış
+        if (!sub.trialUsed && !sub.isActive) {
+            return 'new_user';
+        }
+
+        // Aktif trial
+        if (sub.type === 'trial' && sub.trialEndDate) {
+            const trialEnd = new Date(sub.trialEndDate);
+            if (trialEnd > now) {
+                return 'trial_active';
+            } else {
+                return 'trial_expired';
+            }
+        }
+
+        // Trial kullanılmış ama aktif abonelik yok
+        if (sub.trialUsed && !sub.isActive) {
+            return 'trial_expired';
+        }
+
+        // Aktif abonelik
+        if (sub.isActive && sub.endDate) {
+            const endDate = new Date(sub.endDate);
+            if (endDate > now) {
+                return 'subscribed';
+            } else {
+                return 'expired';
+            }
+        }
+
+        // Aktif ama tarih yok (lifetime vb)
+        if (sub.isActive) {
+            return 'subscribed';
+        }
+
+        return 'new_user';
+    };
+
+    // ✅ YENİ: Format date helper
+    const formatDate = (date) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    };
+
+    const formatDateTime = (date) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    // ✅ YENİ: Subscription status chip render
+    const renderSubscriptionChip = (user) => {
+        const status = getSubscriptionStatus(user);
+        const statusInfo = subscriptionStatuses[status] || subscriptionStatuses.new_user;
+        const daysRemaining = calculateDaysRemaining(user);
+        const IconComponent = statusInfo.icon;
+
+        return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                <Chip
+                    size="small"
+                    icon={<IconComponent sx={{ fontSize: 14 }} />}
+                    label={statusInfo.label}
+                    sx={{
+                        bgcolor: statusInfo.bgColor,
+                        color: statusInfo.color,
+                        fontWeight: 'bold',
+                        fontSize: '0.7rem',
+                        '& .MuiChip-icon': { color: statusInfo.color }
+                    }}
+                />
+                {daysRemaining > 0 && (status === 'trial_active' || status === 'subscribed' || status === 'admin_granted') && (
+                    <Chip
+                        size="small"
+                        icon={<TimeIcon sx={{ fontSize: 10 }} />}
+                        label={`${daysRemaining} gün kaldı`}
+                        sx={{
+                            height: 18,
+                            fontSize: '0.6rem',
+                            bgcolor: daysRemaining <= 3 ? '#FEE2E2' : '#F3F4F6',
+                            color: daysRemaining <= 3 ? '#EF4444' : '#6B7280',
+                            '& .MuiChip-icon': {
+                                color: daysRemaining <= 3 ? '#EF4444' : '#6B7280',
+                                fontSize: 10
+                            }
+                        }}
+                    />
+                )}
+            </Box>
+        );
     };
 
     // Edit Dialog
@@ -307,6 +502,170 @@ const UserManagement = () => {
         setNewPassword(password);
     };
 
+    // ========== ✅ YENİ: ABONELİK YÖNETİMİ ==========
+    const handleOpenSubscriptionDialog = (user, action) => {
+        setSubscriptionDialog({ open: true, user, action });
+        setSubscriptionFormData({
+            type: 'admin_granted',
+            duration: 30,
+            reason: '',
+            days: action === 'trial' ? 7 : 30
+        });
+    };
+
+    const handleCloseSubscriptionDialog = () => {
+        setSubscriptionDialog({ open: false, user: null, action: null });
+    };
+
+    // Abonelik ver
+    const handleGrantSubscription = async () => {
+        setSubscriptionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/grant`,
+                {
+                    type: subscriptionFormData.type,
+                    duration: subscriptionFormData.type === 'lifetime' ? null : subscriptionFormData.duration,
+                    reason: subscriptionFormData.reason || 'Admin tarafından verildi'
+                }
+            );
+
+            if (response.data.success) {
+                showSnackbar('Abonelik başarıyla verildi!', 'success');
+                handleCloseSubscriptionDialog();
+                loadUsers();
+                loadStats();
+            }
+        } catch (error) {
+            console.error('Abonelik verme hatası:', error);
+            showSnackbar(error.response?.data?.message || 'Abonelik verilemedi', 'error');
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Süre uzat
+    const handleExtendSubscription = async () => {
+        setSubscriptionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/extend`,
+                {
+                    days: subscriptionFormData.days,
+                    reason: subscriptionFormData.reason || 'Admin tarafından uzatıldı'
+                }
+            );
+
+            if (response.data.success) {
+                showSnackbar(`Abonelik ${subscriptionFormData.days} gün uzatıldı!`, 'success');
+                handleCloseSubscriptionDialog();
+                loadUsers();
+            }
+        } catch (error) {
+            console.error('Süre uzatma hatası:', error);
+            showSnackbar(error.response?.data?.message || 'Süre uzatılamadı', 'error');
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Trial başlat
+    const handleStartTrial = async () => {
+        setSubscriptionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/start-trial`,
+                {
+                    days: subscriptionFormData.days
+                }
+            );
+
+            if (response.data.success) {
+                showSnackbar(`${subscriptionFormData.days} günlük trial başlatıldı!`, 'success');
+                handleCloseSubscriptionDialog();
+                loadUsers();
+            }
+        } catch (error) {
+            console.error('Trial başlatma hatası:', error);
+            showSnackbar(error.response?.data?.message || 'Trial başlatılamadı', 'error');
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Trial sıfırla
+    const handleResetTrial = async () => {
+        setSubscriptionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/reset-trial`,
+                {
+                    reason: subscriptionFormData.reason || 'Admin tarafından sıfırlandı'
+                }
+            );
+
+            if (response.data.success) {
+                showSnackbar('Trial hakkı sıfırlandı!', 'success');
+                handleCloseSubscriptionDialog();
+                loadUsers();
+            }
+        } catch (error) {
+            console.error('Trial sıfırlama hatası:', error);
+            showSnackbar(error.response?.data?.message || 'Trial sıfırlanamadı', 'error');
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Abonelik iptal
+    const handleRevokeSubscription = async () => {
+        setSubscriptionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/revoke`,
+                {
+                    reason: subscriptionFormData.reason || 'Admin tarafından iptal edildi'
+                }
+            );
+
+            if (response.data.success) {
+                showSnackbar('Abonelik iptal edildi!', 'success');
+                handleCloseSubscriptionDialog();
+                loadUsers();
+            }
+        } catch (error) {
+            console.error('Abonelik iptal hatası:', error);
+            showSnackbar(error.response?.data?.message || 'İptal edilemedi', 'error');
+        } finally {
+            setSubscriptionLoading(false);
+        }
+    };
+
+    // Abonelik geçmişi
+    const handleShowSubscriptionHistory = async (user) => {
+        try {
+            const response = await axios.get(
+                `${API_BASE_URL}/admin/subscriptions/users/${user._id}`
+            );
+
+            if (response.data.success) {
+                setSubscriptionHistoryDialog({
+                    open: true,
+                    user,
+                    history: response.data.data.subscriptionHistory || user.subscriptionHistory || []
+                });
+            }
+        } catch (error) {
+            console.error('Geçmiş yüklenirken hata:', error);
+            // Fallback: user'dan al
+            setSubscriptionHistoryDialog({
+                open: true,
+                user,
+                history: user.subscriptionHistory || []
+            });
+        }
+    };
+
     const renderBadgeChip = (badge) => {
         if (badge === 'trackbang') return null;
 
@@ -324,6 +683,24 @@ const UserManagement = () => {
         );
     };
 
+    // ✅ YENİ: Action menu için subscription durumuna göre hangi butonlar gösterilecek
+    const canStartTrial = (user) => {
+        return !user.subscription?.trialUsed;
+    };
+
+    const canExtend = (user) => {
+        const status = getSubscriptionStatus(user);
+        return ['trial_active', 'subscribed', 'admin_granted'].includes(status);
+    };
+
+    const canRevoke = (user) => {
+        return user.subscription?.isActive;
+    };
+
+    const canResetTrial = (user) => {
+        return user.subscription?.trialUsed;
+    };
+
     return (
         <Box sx={{ p: 3, bgcolor: '#fafafa', minHeight: '100vh' }}>
             {/* Header */}
@@ -334,32 +711,62 @@ const UserManagement = () => {
                     <Chip label="Standart" size="small" sx={{ bgcolor: '#2196f3', color: '#fff', ml: 1 }} />
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Normal kullanıcı hesaplarını görüntüleyin ve yönetin (Artistler hariç)
+                    Kullanıcı hesaplarını ve aboneliklerini yönetin (Artistler hariç)
                 </Typography>
             </Box>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - ✅ GÜNCELLENDİ */}
             <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6} sm={4}>
+                <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
                         <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                            <Typography variant="h4" fontWeight="bold" color="#7C3AED">{stats.totalUsers || 0}</Typography>
-                            <Typography variant="caption" color="text.secondary">Toplam Kullanıcı</Typography>
+                            <GroupIcon sx={{ fontSize: 28, color: '#7C3AED', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#7C3AED">{stats.totalUsers || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Toplam</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={6} sm={4}>
+                <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
                         <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                            <Typography variant="h4" fontWeight="bold" color="#10B981">{stats.activeUsers || 0}</Typography>
-                            <Typography variant="caption" color="text.secondary">Aktif Kullanıcı</Typography>
+                            <CheckCircleIcon sx={{ fontSize: 28, color: '#10B981', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#10B981">{stats.activeUsers || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Aktif</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={6} sm={4}>
-                    <Card sx={{ bgcolor: '#fff', border: '1px solid #e0e0e0' }}>
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{ bgcolor: '#fff', border: '1px solid #10B981' }}>
                         <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                            <Typography variant="h4" fontWeight="bold" color="#F59E0B">{stats.adminUsers || 0}</Typography>
+                            <PremiumIcon sx={{ fontSize: 28, color: '#10B981', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#10B981">{stats.premiumUsers || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Premium</Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{ bgcolor: '#fff', border: '1px solid #3B82F6' }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <TrialIcon sx={{ fontSize: 28, color: '#3B82F6', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#3B82F6">{stats.trialUsers || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Trial</Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{ bgcolor: '#fff', border: '1px solid #F59E0B' }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <WarningIcon sx={{ fontSize: 28, color: '#F59E0B', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#F59E0B">{stats.expiredTrialUsers || 0}</Typography>
+                            <Typography variant="caption" color="text.secondary">Trial Doldu</Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                    <Card sx={{ bgcolor: '#fff', border: '1px solid #EF4444' }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <AdminIcon sx={{ fontSize: 28, color: '#EF4444', mb: 0.5 }} />
+                            <Typography variant="h5" fontWeight="bold" color="#EF4444">{stats.adminUsers || 0}</Typography>
                             <Typography variant="caption" color="text.secondary">Admin</Typography>
                         </CardContent>
                     </Card>
@@ -367,9 +774,10 @@ const UserManagement = () => {
             </Grid>
 
             {/* Info Alert */}
-            <Alert severity="info" sx={{ mb: 3 }}>
+            <Alert severity="info" sx={{ mb: 3 }} icon={<SubscriptionIcon />}>
                 <Typography variant="body2">
-                    <strong>💎 Trackbang rozetli artistler</strong> bu listede görünmez. Onları yönetmek için <strong>Artist Yönetimi</strong> sayfasını kullanın.
+                    <strong>💎 Trackbang rozetli artistler</strong> bu listede görünmez.
+                    <strong> 🎫 Abonelik İşlemleri:</strong> Her kullanıcı satırında abonelik ver, süre uzat, trial başlat ve iptal butonları bulunur.
                 </Typography>
             </Alert>
 
@@ -401,7 +809,7 @@ const UserManagement = () => {
                             onClick={() => setShowFilters(!showFilters)}
                             sx={{ borderColor: '#7C3AED', color: '#7C3AED' }}
                         >
-                            Filtreler
+                            Filtreler {(roleFilter || statusFilter || subscriptionFilter) && `(${[roleFilter, statusFilter, subscriptionFilter].filter(Boolean).length})`}
                         </Button>
                         <IconButton onClick={() => { loadUsers(); loadStats(); }} disabled={loading}>
                             <RefreshIcon sx={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -411,7 +819,7 @@ const UserManagement = () => {
                     <Collapse in={showFilters}>
                         <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                             <Grid container spacing={2}>
-                                <Grid item xs={12} sm={4}>
+                                <Grid item xs={12} sm={3}>
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Rol</InputLabel>
                                         <Select value={roleFilter} label="Rol" onChange={(e) => setRoleFilter(e.target.value)}>
@@ -421,19 +829,68 @@ const UserManagement = () => {
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={12} sm={4}>
+                                <Grid item xs={12} sm={3}>
                                     <FormControl fullWidth size="small">
-                                        <InputLabel>Durum</InputLabel>
-                                        <Select value={statusFilter} label="Durum" onChange={(e) => setStatusFilter(e.target.value)}>
+                                        <InputLabel>Hesap Durumu</InputLabel>
+                                        <Select value={statusFilter} label="Hesap Durumu" onChange={(e) => setStatusFilter(e.target.value)}>
                                             <MenuItem value="">Tümü</MenuItem>
                                             <MenuItem value="active">Aktif</MenuItem>
                                             <MenuItem value="inactive">Pasif</MenuItem>
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={12} sm={4}>
-                                    <Button variant="outlined" fullWidth onClick={() => { setRoleFilter(''); setStatusFilter(''); setSearchQuery(''); }}>
-                                        Filtreleri Temizle
+                                {/* ✅ YENİ: Abonelik Filtresi */}
+                                <Grid item xs={12} sm={3}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Abonelik Durumu</InputLabel>
+                                        <Select value={subscriptionFilter} label="Abonelik Durumu" onChange={(e) => setSubscriptionFilter(e.target.value)}>
+                                            <MenuItem value="">Tümü</MenuItem>
+                                            <MenuItem value="premium">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <PremiumIcon sx={{ color: '#10B981', fontSize: 18 }} />
+                                                    Premium
+                                                </Box>
+                                            </MenuItem>
+                                            <MenuItem value="trial">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <TrialIcon sx={{ color: '#3B82F6', fontSize: 18 }} />
+                                                    Trial Aktif
+                                                </Box>
+                                            </MenuItem>
+                                            <MenuItem value="trial_expired">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <WarningIcon sx={{ color: '#F59E0B', fontSize: 18 }} />
+                                                    Trial Dolmuş
+                                                </Box>
+                                            </MenuItem>
+                                            <MenuItem value="free">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <PersonIcon sx={{ color: '#9CA3AF', fontSize: 18 }} />
+                                                    Ücretsiz
+                                                </Box>
+                                            </MenuItem>
+                                            <MenuItem value="expiring">
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <WarningIcon sx={{ color: '#EF4444', fontSize: 18 }} />
+                                                    Dolmak Üzere (3 gün)
+                                                </Box>
+                                            </MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={3}>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        onClick={() => {
+                                            setRoleFilter('');
+                                            setStatusFilter('');
+                                            setSubscriptionFilter('');
+                                            setSearchQuery('');
+                                        }}
+                                        startIcon={<ClearIcon />}
+                                    >
+                                        Temizle
                                     </Button>
                                 </Grid>
                             </Grid>
@@ -448,10 +905,10 @@ const UserManagement = () => {
                             <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Telefon</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Abonelik Durumu</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Abonelik Türü</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Bitiş Tarihi</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Rozet</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="right">İşlemler</TableCell>
                             </TableRow>
                         </TableHead>
@@ -473,12 +930,20 @@ const UserManagement = () => {
                                     <TableRow key={user._id} hover>
                                         <TableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                <Avatar src={user.profileImage} sx={{ width: 48, height: 48, bgcolor: '#7C3AED' }}>
+                                                <Avatar src={user.profileImage} sx={{ width: 44, height: 44, bgcolor: '#7C3AED' }}>
                                                     {user.firstName?.charAt(0) || user.username?.charAt(0)}
                                                 </Avatar>
                                                 <Box>
-                                                    <Typography fontWeight="bold">
+                                                    <Typography fontWeight="bold" fontSize="0.9rem">
                                                         {user.firstName} {user.lastName}
+                                                        {user.isAdmin && (
+                                                            <Chip
+                                                                icon={<AdminIcon sx={{ fontSize: 12 }} />}
+                                                                label="Admin"
+                                                                size="small"
+                                                                sx={{ ml: 1, height: 18, fontSize: '0.65rem', bgcolor: '#EF4444', color: '#fff' }}
+                                                            />
+                                                        )}
                                                     </Typography>
                                                     <Typography variant="caption" color="text.secondary" fontFamily="monospace">
                                                         @{user.username}
@@ -487,48 +952,139 @@ const UserManagement = () => {
                                             </Box>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2">{user.email}</Typography>
+                                            <Typography variant="body2" fontSize="0.8rem">{user.email}</Typography>
                                         </TableCell>
+                                        {/* ✅ YENİ: Abonelik durumu */}
                                         <TableCell>
-                                            <Typography variant="body2">{user.phone || '-'}</Typography>
+                                            {renderSubscriptionChip(user)}
+                                        </TableCell>
+                                        {/* ✅ YENİ: Abonelik türü */}
+                                        <TableCell>
+                                            {user.subscription?.type ? (
+                                                <Chip
+                                                    size="small"
+                                                    label={subscriptionTypes[user.subscription.type]?.label || user.subscription.type}
+                                                    sx={{
+                                                        bgcolor: `${subscriptionTypes[user.subscription.type]?.color || '#9CA3AF'}20`,
+                                                        color: subscriptionTypes[user.subscription.type]?.color || '#9CA3AF',
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 'bold'
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Typography variant="caption" color="text.secondary">-</Typography>
+                                            )}
+                                        </TableCell>
+                                        {/* ✅ YENİ: Bitiş tarihi */}
+                                        <TableCell>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {user.subscription?.type === 'trial'
+                                                    ? formatDate(user.subscription?.trialEndDate)
+                                                    : formatDate(user.subscription?.endDate)
+                                                }
+                                            </Typography>
                                         </TableCell>
                                         <TableCell>
                                             {renderBadgeChip(user.badge)}
                                         </TableCell>
-                                        <TableCell>
-                                            {user.isAdmin ? (
-                                                <Chip icon={<AdminIcon />} label="Admin" size="small" color="error" />
-                                            ) : (
-                                                <Chip icon={<PersonIcon />} label="Kullanıcı" size="small" variant="outlined" />
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {user.isActive !== false ? (
-                                                <Chip label="Aktif" size="small" sx={{ bgcolor: '#10B981', color: '#fff' }} />
-                                            ) : (
-                                                <Chip label="Pasif" size="small" sx={{ bgcolor: '#EF4444', color: '#fff' }} />
-                                            )}
-                                        </TableCell>
                                         <TableCell align="right">
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                <Tooltip title="Şifre Sıfırla (Trackbang2025!)">
-                                                    <IconButton size="small" onClick={() => handleOpenPasswordDialog(user, 'reset')} sx={{ color: '#F59E0B' }}>
-                                                        <LockResetIcon />
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="wrap">
+                                                {/* ✅ YENİ: Abonelik işlemleri */}
+                                                <Tooltip title="Abonelik Ver">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleOpenSubscriptionDialog(user, 'grant')}
+                                                        sx={{ color: '#10B981' }}
+                                                    >
+                                                        <GiftIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Yeni Şifre Belirle">
-                                                    <IconButton size="small" onClick={() => handleOpenPasswordDialog(user, 'update')} sx={{ color: '#10B981' }}>
-                                                        <KeyIcon />
+
+                                                {canExtend(user) && (
+                                                    <Tooltip title="Süre Uzat">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleOpenSubscriptionDialog(user, 'extend')}
+                                                            sx={{ color: '#3B82F6' }}
+                                                        >
+                                                            <ExtendIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {canStartTrial(user) && (
+                                                    <Tooltip title="Trial Başlat">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleOpenSubscriptionDialog(user, 'trial')}
+                                                            sx={{ color: '#F59E0B' }}
+                                                        >
+                                                            <StartIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {canResetTrial(user) && (
+                                                    <Tooltip title="Trial Sıfırla">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleOpenSubscriptionDialog(user, 'reset')}
+                                                            sx={{ color: '#8B5CF6' }}
+                                                        >
+                                                            <ResetIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {canRevoke(user) && (
+                                                    <Tooltip title="Abonelik İptal">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleOpenSubscriptionDialog(user, 'revoke')}
+                                                            sx={{ color: '#EF4444' }}
+                                                        >
+                                                            <RevokeIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                <Tooltip title="Abonelik Geçmişi">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleShowSubscriptionHistory(user)}
+                                                        sx={{ color: '#6B7280' }}
+                                                    >
+                                                        <HistoryIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+                                                <Tooltip title="Şifre Sıfırla">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleOpenPasswordDialog(user, 'reset')}
+                                                        sx={{ color: '#F59E0B' }}
+                                                    >
+                                                        <LockResetIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Düzenle">
-                                                    <IconButton size="small" onClick={() => handleOpenEditDialog(user)} sx={{ color: '#7C3AED' }}>
-                                                        <EditIcon />
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleOpenEditDialog(user)}
+                                                        sx={{ color: '#7C3AED' }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Sil">
-                                                    <IconButton size="small" onClick={() => handleOpenDeleteDialog(user)} sx={{ color: '#EF4444' }}>
-                                                        <DeleteIcon />
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleOpenDeleteDialog(user)}
+                                                        sx={{ color: '#EF4444' }}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                             </Stack>
@@ -551,6 +1107,491 @@ const UserManagement = () => {
                     labelRowsPerPage="Sayfa başına:"
                 />
             </Paper>
+
+            {/* ========== ✅ YENİ: ABONELİK İŞLEMLERİ DİALOG ========== */}
+            <Dialog
+                open={subscriptionDialog.open}
+                onClose={handleCloseSubscriptionDialog}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{
+                    bgcolor: subscriptionDialog.action === 'grant' ? '#10B981' :
+                        subscriptionDialog.action === 'extend' ? '#3B82F6' :
+                            subscriptionDialog.action === 'trial' ? '#F59E0B' :
+                                subscriptionDialog.action === 'revoke' ? '#EF4444' :
+                                    subscriptionDialog.action === 'reset' ? '#8B5CF6' : '#7C3AED',
+                    color: '#fff'
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {subscriptionDialog.action === 'grant' && <><GiftIcon /> Abonelik Ver</>}
+                        {subscriptionDialog.action === 'extend' && <><ExtendIcon /> Süre Uzat</>}
+                        {subscriptionDialog.action === 'trial' && <><StartIcon /> Trial Başlat</>}
+                        {subscriptionDialog.action === 'revoke' && <><RevokeIcon /> Abonelik İptal</>}
+                        {subscriptionDialog.action === 'reset' && <><ResetIcon /> Trial Sıfırla</>}
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    {subscriptionDialog.user && (
+                        <Box>
+                            {/* Kullanıcı bilgisi */}
+                            <Box sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 2,
+                                mb: 3,
+                                p: 2,
+                                bgcolor: '#f5f5f5',
+                                borderRadius: 1
+                            }}>
+                                <Avatar
+                                    src={subscriptionDialog.user.profileImage}
+                                    sx={{ width: 48, height: 48, bgcolor: '#7C3AED' }}
+                                >
+                                    {subscriptionDialog.user.firstName?.charAt(0)}
+                                </Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography fontWeight="bold">
+                                        {subscriptionDialog.user.firstName} {subscriptionDialog.user.lastName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        @{subscriptionDialog.user.username} • {subscriptionDialog.user.email}
+                                    </Typography>
+                                </Box>
+                                {renderSubscriptionChip(subscriptionDialog.user)}
+                            </Box>
+
+                            {/* Grant Form */}
+                            {subscriptionDialog.action === 'grant' && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Alert severity="info" sx={{ mb: 2 }}>
+                                            Bu kullanıcıya premium abonelik vereceksiniz.
+                                        </Alert>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <FormControl fullWidth>
+                                            <InputLabel>Abonelik Türü</InputLabel>
+                                            <Select
+                                                value={subscriptionFormData.type}
+                                                label="Abonelik Türü"
+                                                onChange={(e) => setSubscriptionFormData(prev => ({ ...prev, type: e.target.value }))}
+                                            >
+                                                <MenuItem value="admin_granted">Admin Verdi</MenuItem>
+                                                <MenuItem value="monthly">Aylık</MenuItem>
+                                                <MenuItem value="yearly">Yıllık</MenuItem>
+                                                <MenuItem value="lifetime">Ömür Boyu</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Süre (gün)"
+                                            type="number"
+                                            value={subscriptionFormData.duration}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({
+                                                ...prev,
+                                                duration: parseInt(e.target.value) || 30
+                                            }))}
+                                            disabled={subscriptionFormData.type === 'lifetime'}
+                                            InputProps={{ inputProps: { min: 1, max: 365 } }}
+                                            helperText={subscriptionFormData.type === 'lifetime' ? 'Ömür boyu için süre gerekmiyor' : ''}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                                            {[7, 30, 90, 180, 365].map(d => (
+                                                <Chip
+                                                    key={d}
+                                                    label={d === 365 ? '1 Yıl' : `${d} gün`}
+                                                    onClick={() => setSubscriptionFormData(prev => ({ ...prev, duration: d }))}
+                                                    variant={subscriptionFormData.duration === d ? 'filled' : 'outlined'}
+                                                    color={subscriptionFormData.duration === d ? 'primary' : 'default'}
+                                                    sx={{ cursor: 'pointer' }}
+                                                    disabled={subscriptionFormData.type === 'lifetime'}
+                                                />
+                                            ))}
+                                        </Stack>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Açıklama (opsiyonel)"
+                                            value={subscriptionFormData.reason}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({ ...prev, reason: e.target.value }))}
+                                            placeholder="Örn: VIP kullanıcı, promosyon, destek talebi..."
+                                            multiline
+                                            rows={2}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            )}
+
+                            {/* Extend Form */}
+                            {subscriptionDialog.action === 'extend' && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Alert severity="info" sx={{ mb: 2 }}>
+                                            Mevcut bitiş tarihi: <strong>
+                                            {subscriptionDialog.user.subscription?.type === 'trial'
+                                                ? formatDate(subscriptionDialog.user.subscription?.trialEndDate)
+                                                : formatDate(subscriptionDialog.user.subscription?.endDate)
+                                            }
+                                        </strong>
+                                        </Alert>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Uzatılacak Gün Sayısı"
+                                            type="number"
+                                            value={subscriptionFormData.days}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({
+                                                ...prev,
+                                                days: parseInt(e.target.value) || 7
+                                            }))}
+                                            InputProps={{ inputProps: { min: 1, max: 365 } }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                            {[3, 7, 15, 30, 60, 90].map(d => (
+                                                <Chip
+                                                    key={d}
+                                                    label={`+${d} gün`}
+                                                    onClick={() => setSubscriptionFormData(prev => ({ ...prev, days: d }))}
+                                                    variant={subscriptionFormData.days === d ? 'filled' : 'outlined'}
+                                                    color={subscriptionFormData.days === d ? 'primary' : 'default'}
+                                                    sx={{ cursor: 'pointer' }}
+                                                />
+                                            ))}
+                                        </Stack>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Açıklama (opsiyonel)"
+                                            value={subscriptionFormData.reason}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({ ...prev, reason: e.target.value }))}
+                                            placeholder="Örn: Destek talebi, telafi, promosyon..."
+                                        />
+                                    </Grid>
+                                </Grid>
+                            )}
+
+                            {/* Trial Form */}
+                            {subscriptionDialog.action === 'trial' && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Alert severity="warning" sx={{ mb: 2 }}>
+                                            Bu kullanıcı için <strong>{subscriptionFormData.days}</strong> günlük deneme süresi başlatılacak.
+                                            <br />
+                                            <small>Trial başladıktan sonra tekrar trial başlatılamaz (sıfırlama hariç).</small>
+                                        </Alert>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Trial Süresi (gün)"
+                                            type="number"
+                                            value={subscriptionFormData.days}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({
+                                                ...prev,
+                                                days: parseInt(e.target.value) || 7
+                                            }))}
+                                            InputProps={{ inputProps: { min: 1, max: 30 } }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Stack direction="row" spacing={1}>
+                                            {[3, 7, 14, 30].map(d => (
+                                                <Chip
+                                                    key={d}
+                                                    label={`${d} gün`}
+                                                    onClick={() => setSubscriptionFormData(prev => ({ ...prev, days: d }))}
+                                                    variant={subscriptionFormData.days === d ? 'filled' : 'outlined'}
+                                                    color={subscriptionFormData.days === d ? 'warning' : 'default'}
+                                                    sx={{ cursor: 'pointer' }}
+                                                />
+                                            ))}
+                                        </Stack>
+                                    </Grid>
+                                </Grid>
+                            )}
+
+                            {/* Revoke Form */}
+                            {subscriptionDialog.action === 'revoke' && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Alert severity="error" sx={{ mb: 2 }}>
+                                            <strong>⚠️ DİKKAT:</strong> Bu kullanıcının aboneliği <strong>hemen</strong> iptal edilecek!
+                                            <br />
+                                            Kullanıcı premium özelliklerine erişimini kaybedecek.
+                                        </Alert>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="İptal Sebebi"
+                                            value={subscriptionFormData.reason}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({ ...prev, reason: e.target.value }))}
+                                            placeholder="Örn: Kural ihlali, kullanıcı talebi, iade..."
+                                            required
+                                            multiline
+                                            rows={2}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            )}
+
+                            {/* Reset Trial Form */}
+                            {subscriptionDialog.action === 'reset' && (
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Alert severity="info" sx={{ mb: 2 }}>
+                                            Kullanıcının trial hakkı sıfırlanacak.
+                                            <br />
+                                            Sıfırlamadan sonra kullanıcı tekrar trial başlatabilecek.
+                                        </Alert>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Açıklama (opsiyonel)"
+                                            value={subscriptionFormData.reason}
+                                            onChange={(e) => setSubscriptionFormData(prev => ({ ...prev, reason: e.target.value }))}
+                                            placeholder="Örn: Teknik sorun, müşteri memnuniyeti..."
+                                        />
+                                    </Grid>
+                                </Grid>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={handleCloseSubscriptionDialog} color="inherit">
+                        İptal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            if (subscriptionDialog.action === 'grant') handleGrantSubscription();
+                            else if (subscriptionDialog.action === 'extend') handleExtendSubscription();
+                            else if (subscriptionDialog.action === 'trial') handleStartTrial();
+                            else if (subscriptionDialog.action === 'revoke') handleRevokeSubscription();
+                            else if (subscriptionDialog.action === 'reset') handleResetTrial();
+                        }}
+                        disabled={subscriptionLoading || (subscriptionDialog.action === 'revoke' && !subscriptionFormData.reason)}
+                        sx={{
+                            bgcolor: subscriptionDialog.action === 'grant' ? '#10B981' :
+                                subscriptionDialog.action === 'extend' ? '#3B82F6' :
+                                    subscriptionDialog.action === 'trial' ? '#F59E0B' :
+                                        subscriptionDialog.action === 'revoke' ? '#EF4444' : '#8B5CF6',
+                            '&:hover': {
+                                bgcolor: subscriptionDialog.action === 'grant' ? '#059669' :
+                                    subscriptionDialog.action === 'extend' ? '#2563EB' :
+                                        subscriptionDialog.action === 'trial' ? '#D97706' :
+                                            subscriptionDialog.action === 'revoke' ? '#DC2626' : '#7C3AED'
+                            }
+                        }}
+                    >
+                        {subscriptionLoading ? (
+                            <CircularProgress size={20} color="inherit" />
+                        ) : (
+                            subscriptionDialog.action === 'grant' ? 'Abonelik Ver' :
+                                subscriptionDialog.action === 'extend' ? 'Süreyi Uzat' :
+                                    subscriptionDialog.action === 'trial' ? 'Trial Başlat' :
+                                        subscriptionDialog.action === 'revoke' ? 'Aboneliği İptal Et' :
+                                            'Trial Sıfırla'
+                        )}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ========== ✅ YENİ: ABONELİK GEÇMİŞİ DİALOG ========== */}
+            <Dialog
+                open={subscriptionHistoryDialog.open}
+                onClose={() => setSubscriptionHistoryDialog({ open: false, user: null, history: [] })}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ bgcolor: '#6B7280', color: '#fff' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <HistoryIcon />
+                        Abonelik Geçmişi
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    {subscriptionHistoryDialog.user && (
+                        <Box>
+                            {/* Kullanıcı bilgisi */}
+                            <Box sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 2,
+                                mb: 3,
+                                p: 2,
+                                bgcolor: '#f5f5f5',
+                                borderRadius: 1
+                            }}>
+                                <Avatar
+                                    src={subscriptionHistoryDialog.user.profileImage}
+                                    sx={{ width: 48, height: 48, bgcolor: '#7C3AED' }}
+                                >
+                                    {subscriptionHistoryDialog.user.firstName?.charAt(0)}
+                                </Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography fontWeight="bold">
+                                        {subscriptionHistoryDialog.user.firstName} {subscriptionHistoryDialog.user.lastName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        @{subscriptionHistoryDialog.user.username}
+                                    </Typography>
+                                </Box>
+                                {renderSubscriptionChip(subscriptionHistoryDialog.user)}
+                            </Box>
+
+                            {/* Mevcut durum özeti */}
+                            <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+                                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <SubscriptionIcon fontSize="small" />
+                                    Mevcut Abonelik Durumu
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6} sm={3}>
+                                        <Typography variant="caption" color="text.secondary">Tür</Typography>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            {subscriptionTypes[subscriptionHistoryDialog.user.subscription?.type]?.label || 'Yok'}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                        <Typography variant="caption" color="text.secondary">Durum</Typography>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            {subscriptionHistoryDialog.user.subscription?.isActive ? 'Aktif' : 'Pasif'}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                        <Typography variant="caption" color="text.secondary">Bitiş Tarihi</Typography>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            {subscriptionHistoryDialog.user.subscription?.type === 'trial'
+                                                ? formatDate(subscriptionHistoryDialog.user.subscription?.trialEndDate)
+                                                : formatDate(subscriptionHistoryDialog.user.subscription?.endDate)
+                                            }
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                        <Typography variant="caption" color="text.secondary">Trial Kullanıldı</Typography>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            {subscriptionHistoryDialog.user.subscription?.trialUsed ? 'Evet' : 'Hayır'}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+
+                            {/* Geçmiş tablosu */}
+                            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <HistoryIcon fontSize="small" />
+                                İşlem Geçmişi
+                            </Typography>
+
+                            {subscriptionHistoryDialog.history.length > 0 ? (
+                                <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Tarih</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>İşlem</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Tür</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Başlangıç</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Bitiş</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Açıklama</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {subscriptionHistoryDialog.history.map((item, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>
+                                                        <Typography variant="caption">
+                                                            {formatDateTime(item.date)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            size="small"
+                                                            label={
+                                                                item.action === 'started' ? 'Başlatıldı' :
+                                                                    item.action === 'activated' ? 'Aktifleşti' :
+                                                                        item.action === 'extended' ? 'Uzatıldı' :
+                                                                            item.action === 'cancelled' ? 'İptal' :
+                                                                                item.action === 'expired' ? 'Süresi Doldu' :
+                                                                                    item.action === 'admin_granted' ? 'Admin Verdi' :
+                                                                                        item.action === 'revoked' ? 'İptal Edildi' :
+                                                                                            item.action === 'trial_started' ? 'Trial Başladı' :
+                                                                                                item.action === 'trial_reset' ? 'Trial Sıfırlandı' :
+                                                                                                    item.action
+                                                            }
+                                                            sx={{
+                                                                bgcolor:
+                                                                    item.action.includes('grant') || item.action.includes('start') || item.action.includes('activ') ? '#D1FAE5' :
+                                                                        item.action.includes('trial') ? '#DBEAFE' :
+                                                                            item.action.includes('extend') ? '#E0E7FF' :
+                                                                                item.action.includes('cancel') || item.action.includes('revoke') ? '#FEE2E2' :
+                                                                                    item.action.includes('expire') ? '#FEF3C7' : '#F3F4F6',
+                                                                color:
+                                                                    item.action.includes('grant') || item.action.includes('start') || item.action.includes('activ') ? '#10B981' :
+                                                                        item.action.includes('trial') ? '#3B82F6' :
+                                                                            item.action.includes('extend') ? '#6366F1' :
+                                                                                item.action.includes('cancel') || item.action.includes('revoke') ? '#EF4444' :
+                                                                                    item.action.includes('expire') ? '#F59E0B' : '#6B7280',
+                                                                fontSize: '0.65rem',
+                                                                fontWeight: 'bold'
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="caption">
+                                                            {subscriptionTypes[item.type]?.label || item.type || '-'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="caption">
+                                                            {formatDate(item.startDate)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="caption">
+                                                            {formatDate(item.endDate)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 150, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {item.reason || '-'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            ) : (
+                                <Alert severity="info" icon={<HistoryIcon />}>
+                                    Henüz abonelik geçmişi bulunmuyor.
+                                </Alert>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setSubscriptionHistoryDialog({ open: false, user: null, history: [] })}
+                        variant="contained"
+                        sx={{ bgcolor: '#6B7280', '&:hover': { bgcolor: '#4B5563' } }}
+                    >
+                        Kapat
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* ========== ŞİFRE YÖNETİMİ DİALOG ========== */}
             <Dialog open={passwordDialog.open} onClose={handleClosePasswordDialog} maxWidth="sm" fullWidth>
@@ -899,6 +1940,16 @@ const UserManagement = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* CSS for spin animation */}
+            <style>
+                {`
+                    @keyframes spin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                `}
+            </style>
         </Box>
     );
 };
