@@ -48,7 +48,7 @@ import {
     AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 
-const API_BASE = 'http://192.168.1.106:5000/api';
+const API_BASE = 'https://api.trackbangserver.com/api';
 
 export default function StoreManagement() {
     // State management

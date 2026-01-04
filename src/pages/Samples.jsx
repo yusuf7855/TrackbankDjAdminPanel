@@ -59,7 +59,7 @@ const Samples = () => {
 
     const handleDownload = async (id) => {
         try {
-            const response = await axios.post(`http://192.168.1.3:5000/api/download/generate`, { sampleId: id });
+            const response = await axios.post(`https://api.trackbangserver.com/api/download/generate`, { sampleId: id });
             window.open(response.data.downloadUrl, '_blank');
         } catch (error) {
             console.error('Download error:', error);
@@ -68,7 +68,7 @@ const Samples = () => {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://192.168.1.3:5000/api/samples/${id}`);
+            await axios.delete(`https://api.trackbangserver.com/api/samples/${id}`);
             setSamples(samples.filter(sample => sample._id !== id));
         } catch (error) {
             console.error('Delete error:', error);

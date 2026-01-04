@@ -40,7 +40,8 @@ import {
     PlaylistAddCheck as ApprovalIcon,
     Category as GenreIcon,
     CardMembership as SubscriptionIcon,  // ✅ YENİ
-    Star as PremiumIcon  // ✅ YENİ
+    Star as PremiumIcon,  // ✅ YENİ
+    SupportAgent as SupportIcon  // ✅ Destek Talepleri
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -120,6 +121,15 @@ const menuItems = [
         description: 'Trial & Premium Yönetimi',
         badge: 'NEW',
         badgeColor: 'success'
+    },
+    {
+        id: 'support',
+        title: 'Destek Talepleri',
+        icon: <SupportIcon />,
+        path: '/admin/support',
+        description: 'Kullanıcı Destek Talepleri',
+        badge: 'NEW',
+        badgeColor: 'warning'
     },
     {
         id: 'notifications',

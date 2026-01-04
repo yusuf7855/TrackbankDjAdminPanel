@@ -1,5 +1,6 @@
 // src/pages/SubscriptionManagement.jsx
 // ✅ Admin Panel - Abonelik Yönetimi
+// ✅ Kalan süre: Gün, Saat, Dakika formatında
 // 3 DURUM: Trial | Premium | Süresi Dolmuş
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -51,14 +52,76 @@ import {
     Star as PremiumIcon,
     Schedule as TrialIcon,
     Warning as WarningIcon,
-    RestartAlt as ResetIcon
+    RestartAlt as ResetIcon,
+    AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.3:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.trackbangserver.com';
+
+// ✅ Kalan süreyi hesapla (gün, saat, dakika)
+const calculateTimeRemaining = (endDate) => {
+    if (!endDate) return { days: 0, hours: 0, minutes: 0, total: 0, isExpired: true };
+
+    const now = new Date();
+    const end = new Date(endDate);
+    const diff = end - now;
+
+    if (diff <= 0) {
+        return { days: 0, hours: 0, minutes: 0, total: 0, isExpired: true };
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    return {
+        days,
+        hours,
+        minutes,
+        total: diff,
+        isExpired: false
+    };
+};
+
+// ✅ Kalan süreyi formatlı string olarak döndür
+const formatTimeRemaining = (timeObj) => {
+    if (timeObj.isExpired) return 'Doldu';
+
+    const parts = [];
+
+    if (timeObj.days > 0) {
+        parts.push(`${timeObj.days}g`);
+    }
+    if (timeObj.hours > 0 || timeObj.days > 0) {
+        parts.push(`${timeObj.hours}s`);
+    }
+    parts.push(`${timeObj.minutes}d`);
+
+    return parts.join(' ');
+};
+
+// ✅ Detaylı kalan süre (Tooltip için)
+const formatTimeRemainingDetailed = (timeObj) => {
+    if (timeObj.isExpired) return 'Süresi dolmuş';
+
+    const parts = [];
+
+    if (timeObj.days > 0) {
+        parts.push(`${timeObj.days} gün`);
+    }
+    if (timeObj.hours > 0) {
+        parts.push(`${timeObj.hours} saat`);
+    }
+    if (timeObj.minutes > 0) {
+        parts.push(`${timeObj.minutes} dakika`);
+    }
+
+    return parts.join(', ') + ' kaldı';
+};
 
 // ✅ Status Chip - Sadece 3 Durum
-const StatusChip = ({ status, daysRemaining }) => {
+const StatusChip = ({ status, timeRemaining }) => {
     const getStatusConfig = () => {
         switch (status) {
             case 'premium':
@@ -72,7 +135,7 @@ const StatusChip = ({ status, daysRemaining }) => {
             case 'trial':
             case 'trial_active':
                 return {
-                    label: `Deneme (${daysRemaining} gün)`,
+                    label: `Deneme (${formatTimeRemaining(timeRemaining)})`,
                     color: 'info',
                     icon: <TrialIcon fontSize="small" />
                 };
@@ -89,13 +152,82 @@ const StatusChip = ({ status, daysRemaining }) => {
 
     const config = getStatusConfig();
     return (
-        <Chip
-            icon={config.icon}
-            label={config.label}
-            color={config.color}
-            size="small"
-            sx={{ fontWeight: 'medium' }}
-        />
+        <Tooltip title={status === 'trial_active' || status === 'trial' ? formatTimeRemainingDetailed(timeRemaining) : ''}>
+            <Chip
+                icon={config.icon}
+                label={config.label}
+                color={config.color}
+                size="small"
+                sx={{ fontWeight: 'medium' }}
+            />
+        </Tooltip>
+    );
+};
+
+// ✅ Kalan Süre Chip Bileşeni
+const TimeRemainingChip = ({ timeRemaining }) => {
+    if (timeRemaining.isExpired) {
+        return (
+            <Chip
+                label="Doldu"
+                size="small"
+                color="error"
+                variant="outlined"
+                icon={<ExpiredIcon />}
+            />
+        );
+    }
+
+    // Renk belirleme
+    let color = 'default';
+    let bgcolor = '#f5f5f5';
+    let textColor = '#333';
+
+    if (timeRemaining.days <= 1) {
+        color = 'error';
+        bgcolor = '#FFEBEE';
+        textColor = '#C62828';
+    } else if (timeRemaining.days <= 3) {
+        color = 'warning';
+        bgcolor = '#FFF3E0';
+        textColor = '#E65100';
+    } else if (timeRemaining.days <= 7) {
+        color = 'info';
+        bgcolor = '#E3F2FD';
+        textColor = '#1565C0';
+    } else {
+        bgcolor = '#E8F5E9';
+        textColor = '#2E7D32';
+    }
+
+    return (
+        <Tooltip title={formatTimeRemainingDetailed(timeRemaining)} arrow>
+            <Chip
+                icon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
+                label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="caption" fontWeight="bold" component="span">
+                            {timeRemaining.days}g
+                        </Typography>
+                        <Typography variant="caption" component="span">
+                            {timeRemaining.hours}s
+                        </Typography>
+                        <Typography variant="caption" component="span">
+                            {timeRemaining.minutes}d
+                        </Typography>
+                    </Box>
+                }
+                size="small"
+                sx={{
+                    bgcolor: bgcolor,
+                    color: textColor,
+                    fontWeight: 'medium',
+                    '& .MuiChip-icon': {
+                        color: textColor
+                    }
+                }}
+            />
+        </Tooltip>
     );
 };
 
@@ -150,6 +282,18 @@ export default function SubscriptionManagement() {
 
     // Snackbar
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+    // ✅ Gerçek zamanlı güncelleme için
+    const [, setTick] = useState(0);
+
+    useEffect(() => {
+        // Her dakika kalan süreleri güncelle
+        const interval = setInterval(() => {
+            setTick(tick => tick + 1);
+        }, 60000); // 1 dakika
+
+        return () => clearInterval(interval);
+    }, []);
 
     // ========== DATA LOADING ==========
 
@@ -207,14 +351,10 @@ export default function SubscriptionManagement() {
         return new Date(date).toLocaleDateString('tr-TR', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         });
-    };
-
-    const calculateDaysRemaining = (endDate) => {
-        if (!endDate) return 0;
-        const diff = new Date(endDate) - new Date();
-        return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     };
 
     // ========== ACTIONS ==========
@@ -474,7 +614,7 @@ export default function SubscriptionManagement() {
                             <TableCell><strong>Durum</strong></TableCell>
                             <TableCell><strong>Abonelik Türü</strong></TableCell>
                             <TableCell><strong>Bitiş Tarihi</strong></TableCell>
-                            <TableCell><strong>Kalan Gün</strong></TableCell>
+                            <TableCell><strong>Kalan Süre</strong></TableCell>
                             <TableCell align="right"><strong>İşlemler</strong></TableCell>
                         </TableRow>
                     </TableHead>
@@ -491,7 +631,7 @@ export default function SubscriptionManagement() {
                             users.map((user) => {
                                 const status = getUserStatus(user);
                                 const endDate = user.subscription.endDate || user.subscription.trialEndDate;
-                                const daysRemaining = calculateDaysRemaining(endDate);
+                                const timeRemaining = calculateTimeRemaining(endDate);
 
                                 return (
                                     <TableRow key={user._id} hover>
@@ -511,7 +651,7 @@ export default function SubscriptionManagement() {
                                             </Box>
                                         </TableCell>
                                         <TableCell>
-                                            <StatusChip status={status} daysRemaining={daysRemaining} />
+                                            <StatusChip status={status} timeRemaining={timeRemaining} />
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="body2">
@@ -523,18 +663,12 @@ export default function SubscriptionManagement() {
                                             </Typography>
                                         </TableCell>
                                         <TableCell>
-                                            {formatDate(endDate)}
+                                            <Typography variant="body2">
+                                                {formatDate(endDate)}
+                                            </Typography>
                                         </TableCell>
                                         <TableCell>
-                                            {daysRemaining > 0 ? (
-                                                <Chip
-                                                    label={`${daysRemaining} gün`}
-                                                    size="small"
-                                                    color={daysRemaining <= 3 ? 'error' : daysRemaining <= 7 ? 'warning' : 'default'}
-                                                />
-                                            ) : (
-                                                <Chip label="Doldu" size="small" color="error" variant="outlined" />
-                                            )}
+                                            <TimeRemainingChip timeRemaining={timeRemaining} />
                                         </TableCell>
                                         <TableCell align="right">
                                             <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -687,10 +821,25 @@ export default function SubscriptionManagement() {
                 </DialogTitle>
                 <DialogContent sx={{ mt: 2 }}>
                     {extendDialog.user && (
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            <strong>{extendDialog.user.fullName}</strong><br />
-                            Mevcut bitiş: {formatDate(extendDialog.user.subscription?.endDate || extendDialog.user.subscription?.trialEndDate)}
-                        </Alert>
+                        <>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                <strong>{extendDialog.user.fullName}</strong><br />
+                                Mevcut bitiş: {formatDate(extendDialog.user.subscription?.endDate || extendDialog.user.subscription?.trialEndDate)}
+                            </Alert>
+                            {/* Kalan süre gösterimi */}
+                            {(() => {
+                                const endDate = extendDialog.user.subscription?.endDate || extendDialog.user.subscription?.trialEndDate;
+                                const timeRemaining = calculateTimeRemaining(endDate);
+                                if (!timeRemaining.isExpired) {
+                                    return (
+                                        <Alert severity="success" sx={{ mb: 2 }}>
+                                            Kalan süre: <strong>{formatTimeRemainingDetailed(timeRemaining)}</strong>
+                                        </Alert>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </>
                     )}
                     <TextField
                         fullWidth

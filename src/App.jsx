@@ -15,7 +15,8 @@ import UserManagement from "./pages/UserManagement.jsx";
 import ArtistManagement from "./pages/ArtistManagement.jsx";
 import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx";
 import GenreManagement from "./pages/GenreManagement.jsx";
-import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";  // ✅ YENİ EKLENEN
+import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";
+import SupportTickets from "./pages/SupportTickets.jsx";
 
 // Modern tema oluştur - Store için renkler eklendi
 const theme = createTheme({
@@ -161,7 +162,8 @@ function App() {
                             <Route path="admin/users" element={<UserManagement />} />
                             <Route path="admin/artists" element={<ArtistManagement />} />
                             <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
-                            <Route path="admin/subscriptions" element={<SubscriptionManagement />} />  {/* ✅ YENİ */}
+                            <Route path="admin/subscriptions" element={<SubscriptionManagement />} />
+                            <Route path="admin/support" element={<SupportTickets />} />
                             <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
                                 <h2>Analytics</h2>
                                 <p>Analytics sayfası yakında...</p>
@@ -181,7 +183,8 @@ function App() {
                             <Route path="store" element={<StoreManagement />} />
                             <Route path="users" element={<UserManagement />} />
                             <Route path="genres" element={<GenreManagement />} />
-                            <Route path="subscriptions" element={<SubscriptionManagement />} />  {/* ✅ Legacy */}
+                            <Route path="subscriptions" element={<SubscriptionManagement />} />
+                            <Route path="support" element={<SupportTickets />} />
                             <Route path="artist-essential" element={<ArtistEssentialApproval />} />
 
                             <Route path="settings" element={<div style={{ padding: '24px' }}>

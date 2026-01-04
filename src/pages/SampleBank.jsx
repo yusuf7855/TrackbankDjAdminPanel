@@ -43,7 +43,7 @@ const SampleBank = () => {
 
     const fetchSamples = async () => {
         try {
-            const response = await fetch('http://192.168.1.3:5000/api/samples');
+            const response = await fetch('https://api.trackbangserver.com/api/samples');
             const data = await response.json();
             setSamples(data);
         } catch (error) {
@@ -102,8 +102,8 @@ const SampleBank = () => {
 
         try {
             const url = editingSample
-                ? `http://192.168.1.3:5000/api/samples/${editingSample._id}`
-                : 'http://192.168.1.3:5000/api/samples';
+                ? `https://api.trackbangserver.com/api/samples/${editingSample._id}`
+                : 'https://api.trackbangserver.com/api/samples';
 
             const method = editingSample ? 'PUT' : 'POST';
 
@@ -154,7 +154,7 @@ const SampleBank = () => {
     const handleDelete = async (sampleId) => {
         if (window.confirm('Bu sample\'ı silmek istediğinizden emin misiniz?')) {
             try {
-                await fetch(`http://192.168.1.3:5000/api/samples/${sampleId}`, {
+                await fetch(`https://api.trackbangserver.com/api/samples/${sampleId}`, {
                     method: 'DELETE'
                 });
                 fetchSamples();

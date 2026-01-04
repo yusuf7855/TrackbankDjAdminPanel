@@ -1,4 +1,5 @@
 // Dashboard.jsx - ARTIST SİSTEMİ + SUBSCRIPTION SİSTEMİ EKLENMİŞ VERSİYON
+// ✅ Backend API yapısına uygun düzeltilmiş versiyon
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -57,15 +58,15 @@ import {
     PersonAdd as PersonAddIcon,
     HowToReg as ClaimIcon,
     MicExternalOn as ArtistIcon,
-    CardMembership as SubscriptionIcon,  // ✅ YENİ
-    Timer as TrialIcon,  // ✅ YENİ
-    Warning as WarningIcon,  // ✅ YENİ
-    CheckCircle as ActiveIcon,  // ✅ YENİ
-    Cancel as ExpiredIcon  // ✅ YENİ
+    CardMembership as SubscriptionIcon,
+    Timer as TrialIcon,
+    Warning as WarningIcon,
+    CheckCircle as ActiveIcon,
+    Cancel as ExpiredIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.1.3:5000/api';
+const API_BASE_URL = 'https://api.trackbangserver.com/api';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -111,7 +112,6 @@ const Dashboard = () => {
             newToday: 0,
             verifiedArtists: 0
         },
-        // ✅ YENİ: Subscription İstatistikleri
         subscriptions: {
             totalPremium: 0,
             activeTrial: 0,
@@ -120,9 +120,9 @@ const Dashboard = () => {
             yearly: 0,
             lifetime: 0,
             adminGranted: 0,
-            expiringSoon: 0,  // 3 gün içinde dolacak
+            expiringSoon: 0,
             newThisMonth: 0,
-            conversionRate: 0  // Trial -> Premium dönüşüm oranı
+            conversionRate: 0
         },
         store: {
             totalListings: 0,
@@ -212,15 +212,16 @@ const Dashboard = () => {
                 axios.get(`${API_BASE_URL}/playlists/admin`).catch(() => ({ data: { data: { playlists: [] } } })),
                 axios.get(`${API_BASE_URL}/artists`).catch(() => ({ data: { data: { artists: [] } } })),
                 axios.get(`${API_BASE_URL}/artists/claims/pending`).catch(() => ({ data: { data: { claims: [] } } })),
-                // ✅ YENİ: Subscription stats API
-                axios.get(`${API_BASE_URL}/admin/subscriptions/stats`).catch(() => ({ data: { data: null } }))
+                axios.get(`${API_BASE_URL}/admin/subscriptions/stats`).catch(() => ({ data: { success: false, stats: null } }))
             ]);
 
             const musicData = musicRes.data?.data?.musics || musicRes.data?.musics || musicRes.data?.music || [];
             const playlistData = playlistsRes.data?.data?.playlists || playlistsRes.data?.playlists || [];
             const artistData = artistsRes.data?.data?.artists || artistsRes.data?.artists || [];
             const pendingClaims = pendingClaimsRes.data?.data?.claims || pendingClaimsRes.data?.claims || [];
-            const subscriptionData = subscriptionStatsRes.data?.data || subscriptionStatsRes.data?.stats || null;
+
+            // ✅ DÜZELTME: Backend API response yapısına uygun parse
+            const subscriptionData = subscriptionStatsRes.data?.success ? subscriptionStatsRes.data.stats : null;
 
             // Calculate music stats
             const musicStats = {
@@ -263,30 +264,48 @@ const Dashboard = () => {
                 verified: artistData.filter(a => a.isVerified).length
             };
 
-            // ✅ YENİ: Subscription stats (API'den geliyorsa kullan, yoksa mock data)
+            // ✅ DÜZELTME: Backend API yapısına uygun subscription stats parse
+            // Backend response yapısı:
+            // {
+            //   success: true,
+            //   stats: {
+            //     totalUsers: number,
+            //     premium: { total: number, percentage: string },
+            //     trial: { active: number, expired: number, newLast7Days: number },
+            //     subscriptions: { active, adminGranted, monthly, yearly, lifetime, newLast30Days },
+            //     platforms: { android: {...}, ios: {...} },
+            //     warnings: { expiringIn3Days, cancelled, billingIssues }
+            //   }
+            // }
             const subscriptionStats = subscriptionData ? {
-                totalPremium: subscriptionData.premium || 0,
-                activeTrial: subscriptionData.activeTrial || 0,
-                expiredTrial: subscriptionData.expiredTrial || 0,
-                monthly: subscriptionData.monthly || 0,
-                yearly: subscriptionData.yearly || 0,
-                lifetime: subscriptionData.lifetime || 0,
-                adminGranted: subscriptionData.adminGranted || 0,
-                expiringSoon: subscriptionData.expiringSoon || 0,
-                newThisMonth: subscriptionData.newThisMonth || 0,
-                conversionRate: subscriptionData.conversionRate || 0
+                totalPremium: subscriptionData.premium?.total || 0,
+                activeTrial: subscriptionData.trial?.active || 0,
+                expiredTrial: subscriptionData.trial?.expired || 0,
+                monthly: subscriptionData.subscriptions?.monthly || 0,
+                yearly: subscriptionData.subscriptions?.yearly || 0,
+                lifetime: subscriptionData.subscriptions?.lifetime || 0,
+                adminGranted: subscriptionData.subscriptions?.adminGranted || 0,
+                expiringSoon: subscriptionData.warnings?.expiringIn3Days || 0,
+                newThisMonth: subscriptionData.subscriptions?.newLast30Days || 0,
+                conversionRate: (() => {
+                    const premiumTotal = subscriptionData.premium?.total || 0;
+                    const trialExpired = subscriptionData.trial?.expired || 0;
+                    const totalConverted = premiumTotal + trialExpired;
+                    if (totalConverted === 0) return 0;
+                    return ((premiumTotal / totalConverted) * 100).toFixed(1);
+                })()
             } : {
-                // Mock data - API hazır değilse
-                totalPremium: 456,
-                activeTrial: 89,
-                expiredTrial: 234,
-                monthly: 312,
-                yearly: 98,
-                lifetime: 12,
-                adminGranted: 34,
-                expiringSoon: 23,
-                newThisMonth: 67,
-                conversionRate: 28.5
+                // Mock data - API hazır değilse veya hata varsa
+                totalPremium: 0,
+                activeTrial: 0,
+                expiredTrial: 0,
+                monthly: 0,
+                yearly: 0,
+                lifetime: 0,
+                adminGranted: 0,
+                expiringSoon: 0,
+                newThisMonth: 0,
+                conversionRate: 0
             };
 
             // Top genres
@@ -310,12 +329,12 @@ const Dashboard = () => {
                 platformLinks: platformStats,
                 playlists: playlistStats,
                 artists: artistStats,
-                subscriptions: subscriptionStats,  // ✅ YENİ
+                subscriptions: subscriptionStats,
                 users: {
-                    total: 2847,
-                    active: 1892,
-                    premium: subscriptionStats.totalPremium,  // ✅ GÜNCELLENDİ
-                    newToday: 23,
+                    total: subscriptionData?.totalUsers || 0,
+                    active: subscriptionData?.totalUsers || 0,
+                    premium: subscriptionStats.totalPremium,
+                    newToday: 0,
                     verifiedArtists: artistStats.claimed
                 },
                 store: {
@@ -334,14 +353,14 @@ const Dashboard = () => {
             setTopGenres(genreData);
             setRecentArtists(sortedArtists);
 
-            // Activity data - ✅ SUBSCRIPTION AKTİVİTELERİ EKLENDİ
+            // Activity data
             const mockActivity = [
                 { id: 1, activity: 'Yeni müzik eklendi', user: 'Admin', type: 'music', time: '2 dakika önce' },
-                { id: 2, activity: 'Yeni premium abonelik', user: 'user_456', type: 'subscription', time: '5 dakika önce' },  // ✅ YENİ
-                { id: 3, activity: 'Trial başlatıldı', user: 'user_789', type: 'trial', time: '8 dakika önce' },  // ✅ YENİ
+                { id: 2, activity: 'Yeni premium abonelik', user: 'user_456', type: 'subscription', time: '5 dakika önce' },
+                { id: 3, activity: 'Trial başlatıldı', user: 'user_789', type: 'trial', time: '8 dakika önce' },
                 { id: 4, activity: 'Yeni artist oluşturuldu', user: 'Admin', type: 'artist', time: '10 dakika önce' },
                 { id: 5, activity: 'Claim başvurusu alındı', user: 'User_123', type: 'claim', time: '15 dakika önce' },
-                { id: 6, activity: 'Admin abonelik verdi', user: 'Admin', type: 'admin_grant', time: '20 dakika önce' }  // ✅ YENİ
+                { id: 6, activity: 'Admin abonelik verdi', user: 'Admin', type: 'admin_grant', time: '20 dakika önce' }
             ];
 
             setRecentActivity(mockActivity);
@@ -366,7 +385,6 @@ const Dashboard = () => {
         return ((stats.artists.claimed / stats.artists.total) * 100).toFixed(1);
     };
 
-    // ✅ YENİ: Premium oranı hesapla
     const getPremiumRate = () => {
         if (stats.users.total === 0) return 0;
         return ((stats.subscriptions.totalPremium / stats.users.total) * 100).toFixed(1);
@@ -420,7 +438,7 @@ const Dashboard = () => {
                                 onClick={() => navigate('/admin/artists')}
                             />
                         )}
-                        {/* ✅ YENİ: Expiring Soon Alert */}
+                        {/* Expiring Soon Alert */}
                         {stats.subscriptions.expiringSoon > 0 && (
                             <Chip
                                 icon={<WarningIcon />}
@@ -594,7 +612,7 @@ const Dashboard = () => {
                     </Grow>
                 </Grid>
 
-                {/* ✅ YENİ: Subscriptions Card */}
+                {/* Subscriptions Card */}
                 <Grid item xs={12} sm={6} md={3}>
                     <Grow in timeout={1200}>
                         <Card sx={{
@@ -708,7 +726,7 @@ const Dashboard = () => {
                 </Grid>
             </Grid>
 
-            {/* ✅ YENİ: Subscription Stats Section */}
+            {/* Subscription Stats Section */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={12}>
                     <Fade in timeout={1500}>
@@ -849,7 +867,7 @@ const Dashboard = () => {
                                             </Box>
                                             <LinearProgress
                                                 variant="determinate"
-                                                value={stats.subscriptions.conversionRate}
+                                                value={parseFloat(stats.subscriptions.conversionRate) || 0}
                                                 sx={{
                                                     borderRadius: 2,
                                                     height: 10,
@@ -873,7 +891,7 @@ const Dashboard = () => {
                                             </Box>
                                             <LinearProgress
                                                 variant="determinate"
-                                                value={parseFloat(getPremiumRate())}
+                                                value={parseFloat(getPremiumRate()) || 0}
                                                 sx={{
                                                     borderRadius: 2,
                                                     height: 10,
@@ -1005,7 +1023,7 @@ const Dashboard = () => {
                                     </Box>
                                     <LinearProgress
                                         variant="determinate"
-                                        value={parseFloat(getClaimRate())}
+                                        value={parseFloat(getClaimRate()) || 0}
                                         sx={{
                                             borderRadius: 2,
                                             height: 10,
@@ -1044,7 +1062,7 @@ const Dashboard = () => {
 
                                 <Grid container spacing={3}>
                                     {Object.entries(platformConfig).map(([key, config]) => {
-                                        const count = stats.platformLinks[key];
+                                        const count = stats.platformLinks[key] || 0;
                                         const percentage = stats.music.total > 0 ? (count / stats.music.total) * 100 : 0;
                                         const Icon = config.icon;
 
@@ -1235,7 +1253,6 @@ const Dashboard = () => {
                                     >
                                         Yeni Artist Ekle
                                     </Button>
-                                    {/* ✅ YENİ: Subscription Quick Action */}
                                     <Button
                                         variant="contained"
                                         startIcon={<SubscriptionIcon />}

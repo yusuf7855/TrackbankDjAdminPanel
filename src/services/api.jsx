@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // ========== CONFIGURATION ==========
-const API_BASE_URL = 'http://192.168.1.3:5000/api';
+const API_BASE_URL = 'https://api.trackbangserver.com';
 
 const api = axios.create({
     baseURL: API_BASE_URL,

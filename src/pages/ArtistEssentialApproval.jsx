@@ -50,7 +50,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.3:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.trackbangserver.com';
 
 // Tab Panel Component
 function TabPanel({ children, value, index, ...other }) {

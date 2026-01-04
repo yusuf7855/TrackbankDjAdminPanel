@@ -42,7 +42,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.1.3:5000/api';
+const API_BASE_URL = 'https://api.trackbangserver.com/api';
 
 const Hot = () => {
     const [hotPlaylists, setHotPlaylists] = useState([]);
