@@ -64,9 +64,7 @@ import {
     CheckCircle as ActiveIcon,
     Cancel as ExpiredIcon
 } from '@mui/icons-material';
-import axios from 'axios';
-
-const API_BASE_URL = 'https://api.trackbangserver.com/api';
+import { api } from '../services/api';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -208,11 +206,11 @@ const Dashboard = () => {
 
             // Fetch real data from API
             const [musicRes, playlistsRes, artistsRes, pendingClaimsRes, subscriptionStatsRes] = await Promise.all([
-                axios.get(`${API_BASE_URL}/music`).catch(() => ({ data: { data: { musics: [] } } })),
-                axios.get(`${API_BASE_URL}/playlists/admin`).catch(() => ({ data: { data: { playlists: [] } } })),
-                axios.get(`${API_BASE_URL}/artists`).catch(() => ({ data: { data: { artists: [] } } })),
-                axios.get(`${API_BASE_URL}/artists/claims/pending`).catch(() => ({ data: { data: { claims: [] } } })),
-                axios.get(`${API_BASE_URL}/admin/subscriptions/stats`).catch(() => ({ data: { success: false, stats: null } }))
+                api.get('/music').catch(() => ({ data: { data: { musics: [] } } })),
+                api.get('/playlists/admin').catch(() => ({ data: { data: { playlists: [] } } })),
+                api.get('/artists').catch(() => ({ data: { data: { artists: [] } } })),
+                api.get('/artists/claims/pending').catch(() => ({ data: { data: { claims: [] } } })),
+                api.get('/admin/subscriptions/stats').catch(() => ({ data: { success: false, stats: null } }))
             ]);
 
             const musicData = musicRes.data?.data?.musics || musicRes.data?.musics || musicRes.data?.music || [];

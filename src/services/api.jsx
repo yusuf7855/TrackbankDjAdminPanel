@@ -2,11 +2,11 @@
 import axios from 'axios';
 
 // ========== CONFIGURATION ==========
-const API_BASE_URL = 'https://api.trackbangserver.com';
+const API_BASE_URL = 'https://api.trackbangserver.com/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    withCredentials: true,
+    withCredentials: false,  // CORS için false olmalı (origin: '*' ile uyumsuz)
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'

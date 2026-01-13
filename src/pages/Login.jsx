@@ -1,11 +1,9 @@
-// src/pages/Login.jsx - Admin Panel Login Page
+// src/pages/Login.jsx - Modern Full-Screen Admin Login
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
-    Card,
-    CardContent,
     TextField,
     Button,
     Typography,
@@ -13,19 +11,18 @@ import {
     CircularProgress,
     InputAdornment,
     IconButton,
-    Avatar,
 } from '@mui/material';
 import {
     Visibility,
     VisibilityOff,
-    AdminPanelSettings,
-    Email,
-    Lock,
+    LockOutlined,
+    EmailOutlined,
 } from '@mui/icons-material';
-import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
     const navigate = useNavigate();
+    const { login, isAuthenticated, loading: authLoading } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -33,38 +30,17 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [checkingAuth, setCheckingAuth] = useState(true);
 
-    // Sayfa yüklendiğinde mevcut token kontrolü
+    // Zaten giriş yapılmışsa yönlendir
     useEffect(() => {
-        const checkExistingAuth = async () => {
-            const token = localStorage.getItem('adminToken');
-            if (token) {
-                try {
-                    const response = await api.get('/admin/auth/verify', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (response.data.success) {
-                        navigate('/admin');
-                        return;
-                    }
-                } catch (err) {
-                    // Token geçersiz, temizle
-                    localStorage.removeItem('adminToken');
-                    localStorage.removeItem('adminUser');
-                }
-            }
-            setCheckingAuth(false);
-        };
-        checkExistingAuth();
-    }, [navigate]);
+        if (!authLoading && isAuthenticated) {
+            navigate('/admin');
+        }
+    }, [isAuthenticated, authLoading, navigate]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => ({ ...prev, [name]: value }));
         setError('');
     };
 
@@ -73,7 +49,6 @@ const Login = () => {
         setError('');
         setLoading(true);
 
-        // Validation
         if (!formData.email || !formData.password) {
             setError('Email ve şifre gereklidir');
             setLoading(false);
@@ -81,39 +56,24 @@ const Login = () => {
         }
 
         try {
-            const response = await api.post('/admin/auth/login', {
-                email: formData.email,
-                password: formData.password
-            });
+            // AuthContext'in login fonksiyonunu kullan
+            const result = await login(formData.email, formData.password);
 
-            if (response.data.success) {
-                // Token ve admin bilgilerini kaydet
-                localStorage.setItem('adminToken', response.data.token);
-                localStorage.setItem('adminUser', JSON.stringify(response.data.admin));
-
-                // Dashboard'a yönlendir
+            if (result.success) {
                 navigate('/admin');
             } else {
-                setError(response.data.message || 'Giriş başarısız');
+                setError(result.message || 'Giriş başarısız');
             }
         } catch (err) {
             console.error('Login error:', err);
-            if (err.response?.data?.message) {
-                setError(err.response.data.message);
-            } else if (err.response?.status === 401) {
-                setError('Geçersiz email veya şifre');
-            } else if (err.response?.status === 403) {
-                setError('Bu panele erişim yetkiniz bulunmamaktadır');
-            } else {
-                setError('Bağlantı hatası. Lütfen tekrar deneyin.');
-            }
+            setError('Bağlantı hatası. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
         }
     };
 
     // Auth kontrolü yapılırken loading göster
-    if (checkingAuth) {
+    if (authLoading) {
         return (
             <Box
                 sx={{
@@ -121,10 +81,10 @@ const Login = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    backgroundColor: '#000',
                 }}
             >
-                <CircularProgress sx={{ color: 'white' }} />
+                <CircularProgress sx={{ color: '#fff' }} />
             </Box>
         );
     }
@@ -133,56 +93,243 @@ const Login = () => {
         <Box
             sx={{
                 minHeight: '100vh',
+                width: '100vw',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: 2,
+                backgroundColor: '#000',
+                overflow: 'hidden',
             }}
         >
-            <Card
+            {/* Sol Taraf - Branding */}
+            <Box
                 sx={{
-                    maxWidth: 420,
-                    width: '100%',
-                    borderRadius: 4,
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                    overflow: 'hidden',
+                    flex: 1,
+                    display: { xs: 'none', md: 'flex' },
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    position: 'relative',
+                    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%)',
+                    borderRight: '1px solid rgba(255,255,255,0.05)',
+                    padding: 6,
                 }}
             >
-                {/* Header */}
+                {/* Background Pattern */}
                 <Box
                     sx={{
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-                        padding: 4,
-                        textAlign: 'center',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundImage: `
+                            radial-gradient(circle at 20% 80%, rgba(255,255,255,0.03) 0%, transparent 50%),
+                            radial-gradient(circle at 80% 20%, rgba(255,255,255,0.03) 0%, transparent 50%)
+                        `,
+                        pointerEvents: 'none',
+                    }}
+                />
+
+                {/* Logo */}
+                <Box
+                    sx={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '24px',
+                        backgroundColor: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        mb: 4,
+                        boxShadow: '0 20px 60px rgba(255,255,255,0.1)',
                     }}
                 >
-                    <Avatar
+                    <Typography
                         sx={{
-                            width: 80,
-                            height: 80,
-                            margin: '0 auto 16px',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            fontSize: 48,
+                            fontWeight: 900,
+                            color: '#000',
+                            letterSpacing: '-2px',
                         }}
                     >
-                        <AdminPanelSettings sx={{ fontSize: 40 }} />
-                    </Avatar>
-                    <Typography variant="h4" sx={{ color: 'white', fontWeight: 700 }}>
-                        TrackBang
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-                        Admin Panel
+                        TB
                     </Typography>
                 </Box>
 
-                {/* Form */}
-                <CardContent sx={{ padding: 4 }}>
+                <Typography
+                    variant="h2"
+                    sx={{
+                        color: '#fff',
+                        fontWeight: 800,
+                        letterSpacing: '-2px',
+                        mb: 2,
+                        textAlign: 'center',
+                    }}
+                >
+                    TrackBang
+                </Typography>
+
+                <Typography
+                    sx={{
+                        color: 'rgba(255,255,255,0.5)',
+                        fontSize: '1.1rem',
+                        textAlign: 'center',
+                        maxWidth: 400,
+                        lineHeight: 1.8,
+                    }}
+                >
+                    Admin Panel - Müzik platformunuzu yönetin,
+                    kullanıcıları takip edin ve içerikleri kontrol edin.
+                </Typography>
+
+                {/* Stats */}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        gap: 6,
+                        mt: 6,
+                    }}
+                >
+                    {[
+                        { value: '2.1K+', label: 'Kullanıcı' },
+                        { value: '1.2K+', label: 'Müzik' },
+                        { value: '45+', label: 'Playlist' },
+                    ].map((stat, index) => (
+                        <Box key={index} sx={{ textAlign: 'center' }}>
+                            <Typography
+                                sx={{
+                                    color: '#fff',
+                                    fontSize: '2rem',
+                                    fontWeight: 700,
+                                }}
+                            >
+                                {stat.value}
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    color: 'rgba(255,255,255,0.4)',
+                                    fontSize: '0.85rem',
+                                }}
+                            >
+                                {stat.label}
+                            </Typography>
+                        </Box>
+                    ))}
+                </Box>
+
+                {/* Version */}
+                <Typography
+                    sx={{
+                        position: 'absolute',
+                        bottom: 32,
+                        color: 'rgba(255,255,255,0.2)',
+                        fontSize: '0.75rem',
+                        letterSpacing: '1px',
+                    }}
+                >
+                    VERSION 2.0.0
+                </Typography>
+            </Box>
+
+            {/* Sağ Taraf - Login Form */}
+            <Box
+                sx={{
+                    flex: { xs: 1, md: '0 0 500px' },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: { xs: 3, sm: 6 },
+                    backgroundColor: '#0a0a0a',
+                }}
+            >
+                <Box
+                    sx={{
+                        width: '100%',
+                        maxWidth: 380,
+                    }}
+                >
+                    {/* Mobile Logo */}
+                    <Box
+                        sx={{
+                            display: { xs: 'flex', md: 'none' },
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            mb: 4,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: '16px',
+                                backgroundColor: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                mb: 2,
+                            }}
+                        >
+                            <Typography
+                                sx={{
+                                    fontSize: 28,
+                                    fontWeight: 900,
+                                    color: '#000',
+                                }}
+                            >
+                                TB
+                            </Typography>
+                        </Box>
+                        <Typography
+                            sx={{
+                                color: '#fff',
+                                fontSize: '1.5rem',
+                                fontWeight: 700,
+                            }}
+                        >
+                            TrackBang
+                        </Typography>
+                    </Box>
+
+                    {/* Form Header */}
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            color: '#fff',
+                            fontWeight: 700,
+                            mb: 1,
+                        }}
+                    >
+                        Hoş Geldiniz
+                    </Typography>
+                    <Typography
+                        sx={{
+                            color: 'rgba(255,255,255,0.5)',
+                            mb: 4,
+                        }}
+                    >
+                        Admin hesabınızla giriş yapın
+                    </Typography>
+
+                    {/* Error Alert */}
                     {error && (
-                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+                        <Alert
+                            severity="error"
+                            sx={{
+                                mb: 3,
+                                borderRadius: 2,
+                                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                                color: '#f44336',
+                                border: '1px solid rgba(244, 67, 54, 0.3)',
+                                '& .MuiAlert-icon': {
+                                    color: '#f44336',
+                                },
+                            }}
+                        >
                             {error}
                         </Alert>
                     )}
 
+                    {/* Form */}
                     <form onSubmit={handleSubmit}>
                         <TextField
                             fullWidth
@@ -191,19 +338,36 @@ const Login = () => {
                             type="email"
                             value={formData.email}
                             onChange={handleChange}
-                            margin="normal"
-                            variant="outlined"
+                            autoComplete="email"
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <Email color="action" />
+                                        <EmailOutlined sx={{ color: 'rgba(255,255,255,0.3)' }} />
                                     </InputAdornment>
                                 ),
                             }}
                             sx={{
+                                mb: 2.5,
                                 '& .MuiOutlinedInput-root': {
+                                    backgroundColor: 'rgba(255,255,255,0.03)',
                                     borderRadius: 2,
-                                }
+                                    color: '#fff',
+                                    '& fieldset': {
+                                        borderColor: 'rgba(255,255,255,0.1)',
+                                    },
+                                    '&:hover fieldset': {
+                                        borderColor: 'rgba(255,255,255,0.2)',
+                                    },
+                                    '&.Mui-focused fieldset': {
+                                        borderColor: '#fff',
+                                    },
+                                },
+                                '& .MuiInputLabel-root': {
+                                    color: 'rgba(255,255,255,0.5)',
+                                    '&.Mui-focused': {
+                                        color: '#fff',
+                                    },
+                                },
                             }}
                         />
 
@@ -214,12 +378,11 @@ const Login = () => {
                             type={showPassword ? 'text' : 'password'}
                             value={formData.password}
                             onChange={handleChange}
-                            margin="normal"
-                            variant="outlined"
+                            autoComplete="current-password"
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <Lock color="action" />
+                                        <LockOutlined sx={{ color: 'rgba(255,255,255,0.3)' }} />
                                     </InputAdornment>
                                 ),
                                 endAdornment: (
@@ -227,6 +390,7 @@ const Login = () => {
                                         <IconButton
                                             onClick={() => setShowPassword(!showPassword)}
                                             edge="end"
+                                            sx={{ color: 'rgba(255,255,255,0.3)' }}
                                         >
                                             {showPassword ? <VisibilityOff /> : <Visibility />}
                                         </IconButton>
@@ -234,9 +398,27 @@ const Login = () => {
                                 ),
                             }}
                             sx={{
+                                mb: 4,
                                 '& .MuiOutlinedInput-root': {
+                                    backgroundColor: 'rgba(255,255,255,0.03)',
                                     borderRadius: 2,
-                                }
+                                    color: '#fff',
+                                    '& fieldset': {
+                                        borderColor: 'rgba(255,255,255,0.1)',
+                                    },
+                                    '&:hover fieldset': {
+                                        borderColor: 'rgba(255,255,255,0.2)',
+                                    },
+                                    '&.Mui-focused fieldset': {
+                                        borderColor: '#fff',
+                                    },
+                                },
+                                '& .MuiInputLabel-root': {
+                                    color: 'rgba(255,255,255,0.5)',
+                                    '&.Mui-focused': {
+                                        color: '#fff',
+                                    },
+                                },
                             }}
                         />
 
@@ -247,41 +429,54 @@ const Login = () => {
                             size="large"
                             disabled={loading}
                             sx={{
-                                mt: 3,
-                                py: 1.5,
+                                py: 1.8,
                                 borderRadius: 2,
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                backgroundColor: '#fff',
+                                color: '#000',
                                 fontWeight: 600,
                                 fontSize: '1rem',
                                 textTransform: 'none',
-                                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                                boxShadow: 'none',
                                 '&:hover': {
-                                    background: 'linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)',
-                                    boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)',
+                                    backgroundColor: 'rgba(255,255,255,0.9)',
+                                    boxShadow: '0 8px 30px rgba(255,255,255,0.2)',
                                 },
                                 '&:disabled': {
-                                    background: '#ccc',
-                                }
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    color: 'rgba(255,255,255,0.3)',
+                                },
                             }}
                         >
                             {loading ? (
-                                <CircularProgress size={24} sx={{ color: 'white' }} />
+                                <CircularProgress size={24} sx={{ color: '#000' }} />
                             ) : (
                                 'Giriş Yap'
                             )}
                         </Button>
                     </form>
 
-                    <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        align="center"
-                        sx={{ mt: 3 }}
-                    >
-                        Bu panel sadece yetkili yöneticiler içindir.
-                    </Typography>
-                </CardContent>
-            </Card>
+                    {/* Footer */}
+                    <Box sx={{ mt: 4, textAlign: 'center' }}>
+                        <Typography
+                            sx={{
+                                color: 'rgba(255,255,255,0.3)',
+                                fontSize: '0.8rem',
+                            }}
+                        >
+                            Bu panel sadece yetkili yöneticiler içindir.
+                        </Typography>
+                        <Typography
+                            sx={{
+                                color: 'rgba(255,255,255,0.2)',
+                                fontSize: '0.75rem',
+                                mt: 1,
+                            }}
+                        >
+                            © 2024 TrackBang. Tüm hakları saklıdır.
+                        </Typography>
+                    </Box>
+                </Box>
+            </Box>
         </Box>
     );
 };

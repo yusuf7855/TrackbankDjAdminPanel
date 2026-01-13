@@ -41,11 +41,48 @@ const Maintenance = () => {
         isActive: false,
         title: 'Bakım Modu',
         message: 'Uygulama şu anda bakımda. Lütfen daha sonra tekrar deneyin.',
-        estimatedEndTime: '',
+        durationMinutes: 30,
         allowAdmins: true
     });
 
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [remainingTime, setRemainingTime] = useState(null);
+
+    // Dakikayı estimatedEndTime'a çevir (şu an + dakika)
+    const minutesToEndTime = (minutes) => {
+        if (!minutes || minutes <= 0) return null;
+        const endTime = new Date();
+        endTime.setMinutes(endTime.getMinutes() + parseInt(minutes));
+        return endTime.toISOString();
+    };
+
+    // estimatedEndTime'dan kalan dakikayı hesapla
+    const endTimeToMinutes = (endTimeStr) => {
+        if (!endTimeStr) return 0;
+        const endTime = new Date(endTimeStr);
+        const now = new Date();
+        const diffMs = endTime - now;
+        if (diffMs <= 0) return 0;
+        return Math.ceil(diffMs / 60000);
+    };
+
+    // Kalan süreyi formatla
+    const formatRemainingTime = (endTimeStr) => {
+        if (!endTimeStr) return null;
+        const endTime = new Date(endTimeStr);
+        const now = new Date();
+        const diffMs = endTime - now;
+        if (diffMs <= 0) return 'Süre doldu';
+
+        const hours = Math.floor(diffMs / 3600000);
+        const minutes = Math.floor((diffMs % 3600000) / 60000);
+        const seconds = Math.floor((diffMs % 60000) / 1000);
+
+        if (hours > 0) {
+            return `${hours} saat ${minutes} dakika ${seconds} saniye`;
+        }
+        return `${minutes} dakika ${seconds} saniye`;
+    };
 
     // Fetch maintenance status
     const fetchMaintenanceStatus = async () => {
@@ -55,15 +92,15 @@ const Maintenance = () => {
             const response = await api.get('/maintenance/admin/status');
             if (response.data.success) {
                 const maintenance = response.data.maintenance;
+                const remainingMins = endTimeToMinutes(maintenance.estimatedEndTime);
                 setMaintenanceData({
                     isActive: maintenance.isActive || false,
                     title: maintenance.title || 'Bakım Modu',
                     message: maintenance.message || 'Uygulama şu anda bakımda. Lütfen daha sonra tekrar deneyin.',
-                    estimatedEndTime: maintenance.estimatedEndTime
-                        ? new Date(maintenance.estimatedEndTime).toISOString().slice(0, 16)
-                        : '',
+                    durationMinutes: remainingMins > 0 ? remainingMins : 30,
                     allowAdmins: maintenance.allowAdmins !== false
                 });
+                setRemainingTime(maintenance.estimatedEndTime);
                 setLastUpdated(response.data.updatedAt);
             }
         } catch (err) {
@@ -78,6 +115,17 @@ const Maintenance = () => {
         fetchMaintenanceStatus();
     }, []);
 
+    // Kalan süreyi her saniye güncelle
+    useEffect(() => {
+        if (!maintenanceData.isActive || !remainingTime) return;
+
+        const timer = setInterval(() => {
+            setRemainingTime(prev => prev); // Force re-render
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [maintenanceData.isActive, remainingTime]);
+
     // Handle toggle maintenance mode
     const handleToggleMaintenance = async () => {
         setSaving(true);
@@ -89,7 +137,7 @@ const Maintenance = () => {
                 isActive: !maintenanceData.isActive,
                 title: maintenanceData.title,
                 message: maintenanceData.message,
-                estimatedEndTime: maintenanceData.estimatedEndTime || null,
+                estimatedEndTime: minutesToEndTime(maintenanceData.durationMinutes),
                 allowAdmins: maintenanceData.allowAdmins
             });
 
@@ -119,7 +167,7 @@ const Maintenance = () => {
             const response = await api.put('/maintenance/admin/settings', {
                 title: maintenanceData.title,
                 message: maintenanceData.message,
-                estimatedEndTime: maintenanceData.estimatedEndTime || null,
+                estimatedEndTime: minutesToEndTime(maintenanceData.durationMinutes),
                 allowAdmins: maintenanceData.allowAdmins
             });
 
@@ -296,13 +344,19 @@ const Maintenance = () => {
 
                                 <TextField
                                     fullWidth
-                                    label="Tahmini Bitiş Zamanı"
-                                    type="datetime-local"
-                                    value={maintenanceData.estimatedEndTime}
-                                    onChange={handleChange('estimatedEndTime')}
+                                    label="Bakım Süresi (Dakika)"
+                                    type="number"
+                                    value={maintenanceData.durationMinutes}
+                                    onChange={handleChange('durationMinutes')}
                                     variant="outlined"
-                                    InputLabelProps={{ shrink: true }}
-                                    helperText="Kullanıcılara gösterilecek tahmini bitiş zamanı"
+                                    InputProps={{
+                                        inputProps: { min: 1, max: 1440 }
+                                    }}
+                                    helperText={
+                                        maintenanceData.isActive && remainingTime
+                                            ? `Kalan süre: ${formatRemainingTime(remainingTime)}`
+                                            : "Bakım modunu açtığınızda bu süre kadar aktif kalacak"
+                                    }
                                 />
 
                                 <Divider />

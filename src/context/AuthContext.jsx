@@ -78,6 +78,7 @@ export const AuthProvider = ({ children }) => {
                 setAuthToken(token);
                 setAdmin(adminData);
                 setIsAuthenticated(true);
+                setLoading(false);  // Loading'i kapat
 
                 return { success: true };
             } else {
