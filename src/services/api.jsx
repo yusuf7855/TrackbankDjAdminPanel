@@ -17,8 +17,8 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
     (config) => {
-        // Token varsa ekle
-        const token = localStorage.getItem('token');
+        // Admin token varsa ekle
+        const token = localStorage.getItem('adminToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -35,7 +35,8 @@ api.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             // Token expired - redirect to login
-            localStorage.removeItem('token');
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminUser');
             window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -54,8 +55,12 @@ const createMultipartHeader = (token) => ({
     }
 });
 
+// ========== AXIOS INSTANCE EXPORT ==========
+// Export raw axios instance for direct usage in AuthContext
+export { api };
+
 // ========== API SERVICES ==========
-export default {
+const apiService = {
     // ========== MUSIC SERVICES ==========
     music: {
         // Get all music
@@ -335,8 +340,36 @@ export default {
             formData.append('folder', folder);
             return api.post('/upload/image', formData, createMultipartHeader(token));
         }
+    },
+
+    // ========== ADMIN SERVICES ==========
+    admin: {
+        // Dashboard stats
+        getDashboardStats: () => api.get('/admin/dashboard/stats'),
+
+        // User management
+        getUsers: (params) => api.get('/admin/users', { params }),
+        getUserById: (id) => api.get(`/admin/users/${id}`),
+        updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+        deleteUser: (id) => api.delete(`/admin/users/${id}`),
+
+        // Analytics
+        getAnalytics: (params) => api.get('/admin/analytics', { params }),
+
+        // Subscriptions
+        getSubscriptions: (params) => api.get('/admin/subscriptions', { params }),
+
+        // Maintenance mode
+        getMaintenanceStatus: () => api.get('/admin/maintenance/status'),
+        setMaintenanceMode: (data) => api.post('/admin/maintenance/toggle', data),
+
+        // Settings
+        getSettings: () => api.get('/admin/settings'),
+        updateSettings: (data) => api.put('/admin/settings', data)
     }
 };
+
+export default apiService;
 
 // ========== EXPORT NAMED ==========
 export const {
@@ -350,17 +383,6 @@ export const {
     notifications,
     store,
     downloads,
-    utils
-} = {
-    music: api.music,
-    playlists: api.playlists,
-    hot: api.hot,
-    search: api.search,
-    samples: api.samples,
-    payments: api.payments,
-    auth: api.auth,
-    notifications: api.notifications,
-    store: api.store,
-    downloads: api.downloads,
-    utils: api.utils
-};
+    utils,
+    admin
+} = apiService;

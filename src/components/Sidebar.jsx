@@ -39,9 +39,10 @@ import {
     MicExternalOn as ArtistIcon,
     PlaylistAddCheck as ApprovalIcon,
     Category as GenreIcon,
-    CardMembership as SubscriptionIcon,  // ✅ YENİ
-    Star as PremiumIcon,  // ✅ YENİ
-    SupportAgent as SupportIcon  // ✅ Destek Talepleri
+    CardMembership as SubscriptionIcon,
+    Star as PremiumIcon,
+    SupportAgent as SupportIcon,
+    Build as MaintenanceIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -153,6 +154,15 @@ const menuItems = [
         icon: <AnalyticsIcon />,
         path: '/admin/analytics',
         description: 'İstatistikler'
+    },
+    {
+        id: 'maintenance',
+        title: 'Bakım Modu',
+        icon: <MaintenanceIcon />,
+        path: '/admin/maintenance',
+        description: 'Uygulama Bakım Yönetimi',
+        badge: null,
+        badgeColor: 'warning'
     },
     {
         id: 'settings',

@@ -1,8 +1,13 @@
+// src/App.jsx - TrackBang Admin Panel with Authentication
+
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AddMusic from './pages/AddMusic';
 import Samples from './pages/Samples';
@@ -17,8 +22,9 @@ import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx";
 import GenreManagement from "./pages/GenreManagement.jsx";
 import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";
 import SupportTickets from "./pages/SupportTickets.jsx";
+import Maintenance from "./pages/Maintenance.jsx";
 
-// Modern tema oluştur - Store için renkler eklendi
+// Modern tema oluştur
 const theme = createTheme({
     palette: {
         mode: 'light',
@@ -137,63 +143,80 @@ const theme = createTheme({
     },
 });
 
+// Protected Layout wrapper
+const ProtectedLayout = () => (
+    <ProtectedRoute>
+        <Layout />
+    </ProtectedRoute>
+);
+
 function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Router>
-                <Box sx={{
-                    display: 'flex',
-                    minHeight: '100vh',
-                    bgcolor: 'background.default'
-                }}>
-                    <Routes>
-                        <Route path="/" element={<Layout />}>
-                            <Route index element={<Dashboard />} />
-                            <Route path="admin" element={<Dashboard />} />
+                <AuthProvider>
+                    <Box sx={{
+                        display: 'flex',
+                        minHeight: '100vh',
+                        bgcolor: 'background.default'
+                    }}>
+                        <Routes>
+                            {/* Public Route - Login */}
+                            <Route path="/login" element={<Login />} />
 
-                            {/* Admin Panel Routes */}
-                            <Route path="admin/music" element={<AddMusic />} />
-                            <Route path="admin/genres" element={<GenreManagement />} />
-                            <Route path="admin/playlists" element={<Playlists />} />
-                            <Route path="admin/samples" element={<SampleBank />} />
-                            <Route path="admin/store" element={<StoreManagement />} />
-                            <Route path="admin/notifications" element={<Notifications />} />
-                            <Route path="admin/users" element={<UserManagement />} />
-                            <Route path="admin/artists" element={<ArtistManagement />} />
-                            <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
-                            <Route path="admin/subscriptions" element={<SubscriptionManagement />} />
-                            <Route path="admin/support" element={<SupportTickets />} />
-                            <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
-                                <h2>Analytics</h2>
-                                <p>Analytics sayfası yakında...</p>
-                            </div>} />
-                            <Route path="admin/settings" element={<div style={{ padding: '24px' }}>
-                                <h2>Ayarlar</h2>
-                                <p>Ayarlar sayfası yakında...</p>
-                            </div>} />
+                            {/* Protected Routes */}
+                            <Route path="/" element={<ProtectedLayout />}>
+                                <Route index element={<Dashboard />} />
+                                <Route path="admin" element={<Dashboard />} />
 
-                            {/* Legacy routes (eski routelar) - backward compatibility için */}
-                            <Route path="add-music" element={<AddMusic />} />
-                            <Route path="samples" element={<Samples />} />
-                            <Route path="upload" element={<UploadSample />} />
-                            <Route path="sample-bank" element={<SampleBank />} />
-                            <Route path="notifications" element={<Notifications />} />
-                            <Route path="playlists" element={<Playlists />} />
-                            <Route path="store" element={<StoreManagement />} />
-                            <Route path="users" element={<UserManagement />} />
-                            <Route path="genres" element={<GenreManagement />} />
-                            <Route path="subscriptions" element={<SubscriptionManagement />} />
-                            <Route path="support" element={<SupportTickets />} />
-                            <Route path="artist-essential" element={<ArtistEssentialApproval />} />
+                                {/* Admin Panel Routes */}
+                                <Route path="admin/music" element={<AddMusic />} />
+                                <Route path="admin/genres" element={<GenreManagement />} />
+                                <Route path="admin/playlists" element={<Playlists />} />
+                                <Route path="admin/samples" element={<SampleBank />} />
+                                <Route path="admin/store" element={<StoreManagement />} />
+                                <Route path="admin/notifications" element={<Notifications />} />
+                                <Route path="admin/users" element={<UserManagement />} />
+                                <Route path="admin/artists" element={<ArtistManagement />} />
+                                <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
+                                <Route path="admin/subscriptions" element={<SubscriptionManagement />} />
+                                <Route path="admin/support" element={<SupportTickets />} />
+                                <Route path="admin/maintenance" element={<Maintenance />} />
+                                <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
+                                    <h2>Analytics</h2>
+                                    <p>Analytics sayfası yakında...</p>
+                                </div>} />
+                                <Route path="admin/settings" element={<div style={{ padding: '24px' }}>
+                                    <h2>Ayarlar</h2>
+                                    <p>Ayarlar sayfası yakında...</p>
+                                </div>} />
 
-                            <Route path="settings" element={<div style={{ padding: '24px' }}>
-                                <h2>Ayarlar</h2>
-                                <p>Ayarlar sayfası yakında...</p>
-                            </div>} />
-                        </Route>
-                    </Routes>
-                </Box>
+                                {/* Legacy routes (backward compatibility) */}
+                                <Route path="add-music" element={<AddMusic />} />
+                                <Route path="samples" element={<Samples />} />
+                                <Route path="upload" element={<UploadSample />} />
+                                <Route path="sample-bank" element={<SampleBank />} />
+                                <Route path="notifications" element={<Notifications />} />
+                                <Route path="playlists" element={<Playlists />} />
+                                <Route path="store" element={<StoreManagement />} />
+                                <Route path="users" element={<UserManagement />} />
+                                <Route path="genres" element={<GenreManagement />} />
+                                <Route path="subscriptions" element={<SubscriptionManagement />} />
+                                <Route path="support" element={<SupportTickets />} />
+                                <Route path="artist-essential" element={<ArtistEssentialApproval />} />
+
+                                <Route path="settings" element={<div style={{ padding: '24px' }}>
+                                    <h2>Ayarlar</h2>
+                                    <p>Ayarlar sayfası yakında...</p>
+                                </div>} />
+                            </Route>
+
+                            {/* Catch all - redirect to login or dashboard */}
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </Box>
+                </AuthProvider>
             </Router>
         </ThemeProvider>
     );

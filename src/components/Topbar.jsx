@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+// src/components/Topbar.jsx - Admin Panel Topbar with Auth Integration
+
+import { useState } from 'react';
 import {
     AppBar,
     Toolbar,
@@ -18,21 +20,19 @@ import {
 import {
     Menu as MenuIcon,
     Notifications as NotificationsIcon,
-    Mail as MailIcon,
     Person as PersonIcon,
     Settings as SettingsIcon,
     Logout as LogoutIcon,
     Search as SearchIcon,
-    DarkMode as DarkModeIcon,
-    LightMode as LightModeIcon,
-    AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Topbar = ({ onMenuClick }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [notificationAnchor, setNotificationAnchor] = useState(null);
     const location = useLocation();
+    const { admin, logout } = useAuth();
 
     const handleMenu = (event) => {
         setAnchorEl(event.currentTarget);
@@ -47,7 +47,12 @@ const Topbar = ({ onMenuClick }) => {
         setNotificationAnchor(null);
     };
 
-    // Sayfa başlığını al - ✅ SUBSCRIPTIONS EKLENDİ
+    const handleLogout = () => {
+        handleClose();
+        logout();
+    };
+
+    // Sayfa başlığını al
     const getPageTitle = () => {
         const path = location.pathname;
         const titles = {
@@ -61,24 +66,32 @@ const Topbar = ({ onMenuClick }) => {
             '/admin/artists': 'Artist Yönetimi',
             '/admin/artist-essential': 'Artist Essential',
             '/admin/genres': 'Genre Yönetimi',
-            '/admin/subscriptions': 'Abonelik Yönetimi',  // ✅ YENİ
+            '/admin/subscriptions': 'Abonelik Yönetimi',
+            '/admin/maintenance': 'Bakım Modu',
             '/admin/analytics': 'Analytics',
             '/admin/settings': 'Ayarlar'
         };
         return titles[path] || 'Admin Panel';
     };
 
-    // Mock notifications - ✅ SUBSCRIPTION BİLDİRİMİ EKLENDİ
+    // Mock notifications
     const notifications = [
         { id: 1, title: 'Yeni müzik eklendi', time: '2 dakika önce', read: false },
         { id: 2, title: 'Sistem güncellendi', time: '1 saat önce', read: false },
         { id: 3, title: 'Yeni kullanıcı kaydı', time: '3 saat önce', read: true },
         { id: 4, title: 'Playlist onaylandı', time: '5 saat önce', read: true },
-        { id: 5, title: '12 trial süresi dolmak üzere', time: '6 saat önce', read: false },  // ✅ YENİ
-        { id: 6, title: '5 yeni premium abonelik', time: '1 gün önce', read: true }  // ✅ YENİ
+        { id: 5, title: '12 trial süresi dolmak üzere', time: '6 saat önce', read: false },
+        { id: 6, title: '5 yeni premium abonelik', time: '1 gün önce', read: true }
     ];
 
     const unreadCount = notifications.filter(n => !n.read).length;
+
+    // Admin adını al
+    const adminName = admin?.firstName
+        ? `${admin.firstName} ${admin.lastName || ''}`.trim()
+        : admin?.username || 'Admin';
+
+    const adminInitial = adminName.charAt(0).toUpperCase();
 
     return (
         <AppBar
@@ -210,7 +223,7 @@ const Topbar = ({ onMenuClick }) => {
                                     color: '#000'
                                 }}
                             >
-                                Admin User
+                                {adminName}
                             </Typography>
                             <Typography
                                 variant="caption"
@@ -223,6 +236,7 @@ const Topbar = ({ onMenuClick }) => {
                             </Typography>
                         </Box>
                         <Avatar
+                            src={admin?.profileImage}
                             sx={{
                                 width: 36,
                                 height: 36,
@@ -231,7 +245,7 @@ const Topbar = ({ onMenuClick }) => {
                                 fontWeight: 600
                             }}
                         >
-                            A
+                            {adminInitial}
                         </Avatar>
                     </Box>
                 </Box>
@@ -322,7 +336,6 @@ const Topbar = ({ onMenuClick }) => {
                             }}
                             onClick={() => {
                                 handleClose();
-                                // Navigate to notifications
                             }}
                         >
                             Tüm bildirimleri gör
@@ -349,10 +362,10 @@ const Topbar = ({ onMenuClick }) => {
                 >
                     <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #e5e5e5' }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000' }}>
-                            Admin User
+                            {adminName}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#666' }}>
-                            admin@trackbang.com
+                            {admin?.email || 'admin@trackbang.com'}
                         </Typography>
                     </Box>
 
@@ -401,11 +414,11 @@ const Topbar = ({ onMenuClick }) => {
                     <Divider sx={{ my: 0.5 }} />
 
                     <MenuItem
-                        onClick={handleClose}
+                        onClick={handleLogout}
                         sx={{
                             py: 1.2,
                             '&:hover': {
-                                backgroundColor: '#f5f5f5'
+                                backgroundColor: '#fff5f5'
                             }
                         }}
                     >
