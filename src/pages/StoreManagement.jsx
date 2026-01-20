@@ -30,7 +30,9 @@ import {
     Avatar,
     Tooltip,
     Switch,
-    FormControlLabel
+    FormControlLabel,
+    Autocomplete,
+    CircularProgress
 } from '@mui/material';
 import {
     Store as StoreIcon,
@@ -45,8 +47,10 @@ import {
     Category as CategoryIcon,
     TrendingUp as TrendingUpIcon,
     LocalOffer as LocalOfferIcon,
-    AccessTime as AccessTimeIcon
+    AccessTime as AccessTimeIcon,
+    Person as PersonIcon
 } from '@mui/icons-material';
+import { api } from '../services/api';
 
 const API_BASE = 'https://api.trackbangserver.com/api';
 
@@ -80,6 +84,12 @@ export default function StoreManagement() {
         rightsAmount: 1,
         reason: ''
     });
+
+    // User search states for grant rights
+    const [userSearchQuery, setUserSearchQuery] = useState('');
+    const [userSearchResults, setUserSearchResults] = useState([]);
+    const [userSearchLoading, setUserSearchLoading] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
     const [statusForm, setStatusForm] = useState({
         status: '',
         isActive: false
@@ -113,6 +123,45 @@ export default function StoreManagement() {
         loadStoreStats();
         loadListings();
     }, [page, rowsPerPage, filters]);
+
+    // Search users by username
+    const searchUsers = async (query) => {
+        if (!query || query.length < 2) {
+            setUserSearchResults([]);
+            return;
+        }
+
+        setUserSearchLoading(true);
+        try {
+            const response = await api.get('/admin/users', {
+                params: {
+                    search: query,
+                    limit: 10,
+                    page: 1
+                }
+            });
+
+            if (response.data.success) {
+                setUserSearchResults(response.data.data.users || []);
+            }
+        } catch (error) {
+            console.error('Error searching users:', error);
+            setUserSearchResults([]);
+        } finally {
+            setUserSearchLoading(false);
+        }
+    };
+
+    // Debounced user search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (userSearchQuery) {
+                searchUsers(userSearchQuery);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [userSearchQuery]);
 
     // Load store statistics
     const loadStoreStats = async () => {
@@ -164,26 +213,41 @@ export default function StoreManagement() {
 
     // Grant listing rights
     const handleGrantRights = async () => {
+        if (!selectedUser) {
+            showAlert('Lütfen bir kullanıcı seçin', 'error');
+            return;
+        }
+
         try {
-            const response = await fetch(`${API_BASE}/store/admin/rights/grant`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(grantRightsForm)
+            const response = await api.post('/store/admin/rights/grant', {
+                userId: selectedUser._id,
+                rightsAmount: grantRightsForm.rightsAmount,
+                reason: grantRightsForm.reason
             });
 
-            const data = await response.json();
-
-            if (data.success) {
-                showAlert(`${grantRightsForm.rightsAmount} ilan hakkı başarıyla verildi`, 'success');
+            if (response.data.success) {
+                showAlert(`${grantRightsForm.rightsAmount} ilan hakkı @${selectedUser.username} kullanıcısına başarıyla verildi`, 'success');
                 setGrantRightsModal(false);
                 setGrantRightsForm({ userId: '', rightsAmount: 1, reason: '' });
+                setSelectedUser(null);
+                setUserSearchQuery('');
+                setUserSearchResults([]);
             } else {
-                showAlert(data.message || 'Hak verme işlemi başarısız', 'error');
+                showAlert(response.data.message || 'Hak verme işlemi başarısız', 'error');
             }
         } catch (error) {
             console.error('Error granting rights:', error);
-            showAlert('Hak verme işlemi başarısız', 'error');
+            showAlert(error.response?.data?.message || 'Hak verme işlemi başarısız', 'error');
         }
+    };
+
+    // Reset grant rights modal
+    const handleCloseGrantRightsModal = () => {
+        setGrantRightsModal(false);
+        setGrantRightsForm({ userId: '', rightsAmount: 1, reason: '' });
+        setSelectedUser(null);
+        setUserSearchQuery('');
+        setUserSearchResults([]);
     };
 
     // Update listing status
@@ -571,40 +635,118 @@ export default function StoreManagement() {
             </Paper>
 
             {/* Grant Rights Modal */}
-            <Dialog open={grantRightsModal} onClose={() => setGrantRightsModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>İlan Hakkı Ver</DialogTitle>
+            <Dialog open={grantRightsModal} onClose={handleCloseGrantRightsModal} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AddIcon />
+                        İlan Hakkı Ver
+                    </Box>
+                </DialogTitle>
                 <DialogContent>
-                    <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
+                    <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {/* User Search Autocomplete */}
+                        <Autocomplete
                             fullWidth
-                            label="Kullanıcı ID"
-                            value={grantRightsForm.userId}
-                            onChange={(e) => setGrantRightsForm(prev => ({ ...prev, userId: e.target.value }))}
-                            placeholder="Kullanıcı ID'sini girin"
+                            options={userSearchResults}
+                            getOptionLabel={(option) => option.username ? `@${option.username}` : ''}
+                            value={selectedUser}
+                            onChange={(event, newValue) => {
+                                setSelectedUser(newValue);
+                                if (newValue) {
+                                    setGrantRightsForm(prev => ({ ...prev, userId: newValue._id }));
+                                }
+                            }}
+                            inputValue={userSearchQuery}
+                            onInputChange={(event, newInputValue) => {
+                                setUserSearchQuery(newInputValue);
+                            }}
+                            loading={userSearchLoading}
+                            noOptionsText={userSearchQuery.length < 2 ? "En az 2 karakter girin..." : "Kullanıcı bulunamadı"}
+                            renderOption={(props, option) => (
+                                <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Avatar
+                                        src={option.profileImage}
+                                        sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}
+                                    >
+                                        {option.firstName?.charAt(0) || option.username?.charAt(0)}
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="body2" fontWeight="bold">
+                                            {option.firstName} {option.lastName}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            @{option.username} • {option.email}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            )}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Kullanıcı Ara"
+                                    placeholder="Kullanıcı adı, isim veya email ile ara..."
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        startAdornment: (
+                                            <>
+                                                <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                                {params.InputProps.startAdornment}
+                                            </>
+                                        ),
+                                        endAdornment: (
+                                            <>
+                                                {userSearchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </>
+                                        ),
+                                    }}
+                                />
+                            )}
                         />
+
+                        {/* Selected User Info */}
+                        {selectedUser && (
+                            <Alert severity="info" icon={<PersonIcon />}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Avatar
+                                        src={selectedUser.profileImage}
+                                        sx={{ width: 24, height: 24 }}
+                                    >
+                                        {selectedUser.firstName?.charAt(0)}
+                                    </Avatar>
+                                    <Typography variant="body2">
+                                        <strong>@{selectedUser.username}</strong> - {selectedUser.firstName} {selectedUser.lastName}
+                                    </Typography>
+                                </Box>
+                            </Alert>
+                        )}
+
                         <TextField
                             fullWidth
                             type="number"
                             label="Hak Miktarı"
                             value={grantRightsForm.rightsAmount}
-                            onChange={(e) => setGrantRightsForm(prev => ({ ...prev, rightsAmount: parseInt(e.target.value) }))}
+                            onChange={(e) => setGrantRightsForm(prev => ({ ...prev, rightsAmount: parseInt(e.target.value) || 1 }))}
                             inputProps={{ min: 1, max: 100 }}
+                            helperText="Verilecek ilan hakkı sayısı (1-100)"
                         />
                         <TextField
                             fullWidth
-                            label="Sebep"
+                            label="Sebep (Opsiyonel)"
                             value={grantRightsForm.reason}
                             onChange={(e) => setGrantRightsForm(prev => ({ ...prev, reason: e.target.value }))}
-                            placeholder="Hak verme sebebi"
+                            placeholder="Örn: Promosyon, destek talebi..."
+                            multiline
+                            rows={2}
                         />
                     </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setGrantRightsModal(false)}>İptal</Button>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={handleCloseGrantRightsModal} color="inherit">İptal</Button>
                     <Button
                         onClick={handleGrantRights}
                         variant="contained"
-                        disabled={!grantRightsForm.userId || !grantRightsForm.rightsAmount}
+                        disabled={!selectedUser || !grantRightsForm.rightsAmount}
                     >
                         Hak Ver
                     </Button>
