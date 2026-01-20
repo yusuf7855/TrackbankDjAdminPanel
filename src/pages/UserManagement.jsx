@@ -80,9 +80,7 @@ import {
     AccessTime as TimeIcon,
     TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
-import axios from 'axios';
-
-const API_BASE_URL = 'https://api.trackbangserver.com/api';
+import { api } from '../services/api';
 
 // Badge Tanımları (sadece görüntüleme için - trackbang hariç)
 const badges = {
@@ -198,7 +196,7 @@ const UserManagement = () => {
                 excludeBadge: 'trackbang'
             };
 
-            const response = await axios.get(`${API_BASE_URL}/admin/users`, { params });
+            const response = await api.get('/admin/users', { params });
 
             if (response.data.success) {
                 const filteredUsers = (response.data.data.users || []).filter(
@@ -217,7 +215,7 @@ const UserManagement = () => {
 
     const loadStats = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/admin/dashboard/stats`);
+            const response = await api.get('/admin/dashboard/stats');
             if (response.data.success) {
                 setStats(response.data.data.stats || {});
             }
@@ -401,7 +399,7 @@ const UserManagement = () => {
 
     const handleSaveUser = async () => {
         try {
-            await axios.put(`${API_BASE_URL}/admin/users/${editDialog.user._id}`, editFormData);
+            await api.put(`/admin/users/${editDialog.user._id}`, editFormData);
             showSnackbar('Kullanıcı güncellendi', 'success');
             handleCloseEditDialog();
             loadUsers();
@@ -423,7 +421,7 @@ const UserManagement = () => {
 
     const handleDeleteUser = async () => {
         try {
-            await axios.delete(`${API_BASE_URL}/admin/users/${deleteDialog.user._id}`);
+            await api.delete(`/admin/users/${deleteDialog.user._id}`);
             showSnackbar('Kullanıcı silindi', 'success');
             handleCloseDeleteDialog();
             loadUsers();
@@ -449,8 +447,8 @@ const UserManagement = () => {
     const handleResetPassword = async () => {
         setPasswordLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/users/${passwordDialog.user._id}/reset-password`
+            const response = await api.post(
+                `/admin/users/${passwordDialog.user._id}/reset-password`
             );
 
             if (response.data.success) {
@@ -474,8 +472,8 @@ const UserManagement = () => {
 
         setPasswordLoading(true);
         try {
-            const response = await axios.put(
-                `${API_BASE_URL}/admin/users/${passwordDialog.user._id}/password`,
+            const response = await api.put(
+                `/admin/users/${passwordDialog.user._id}/password`,
                 { newPassword }
             );
 
@@ -520,8 +518,8 @@ const UserManagement = () => {
     const handleGrantSubscription = async () => {
         setSubscriptionLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/grant`,
+            const response = await api.post(
+                `/admin/subscriptions/users/${subscriptionDialog.user._id}/grant`,
                 {
                     type: subscriptionFormData.type,
                     duration: subscriptionFormData.type === 'lifetime' ? null : subscriptionFormData.duration,
@@ -547,8 +545,8 @@ const UserManagement = () => {
     const handleExtendSubscription = async () => {
         setSubscriptionLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/extend`,
+            const response = await api.post(
+                `/admin/subscriptions/users/${subscriptionDialog.user._id}/extend`,
                 {
                     days: subscriptionFormData.days,
                     reason: subscriptionFormData.reason || 'Admin tarafından uzatıldı'
@@ -572,8 +570,8 @@ const UserManagement = () => {
     const handleStartTrial = async () => {
         setSubscriptionLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/start-trial`,
+            const response = await api.post(
+                `/admin/subscriptions/users/${subscriptionDialog.user._id}/start-trial`,
                 {
                     days: subscriptionFormData.days
                 }
@@ -596,8 +594,8 @@ const UserManagement = () => {
     const handleResetTrial = async () => {
         setSubscriptionLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/reset-trial`,
+            const response = await api.post(
+                `/admin/subscriptions/users/${subscriptionDialog.user._id}/reset-trial`,
                 {
                     reason: subscriptionFormData.reason || 'Admin tarafından sıfırlandı'
                 }
@@ -620,8 +618,8 @@ const UserManagement = () => {
     const handleRevokeSubscription = async () => {
         setSubscriptionLoading(true);
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/subscriptions/users/${subscriptionDialog.user._id}/revoke`,
+            const response = await api.post(
+                `/admin/subscriptions/users/${subscriptionDialog.user._id}/revoke`,
                 {
                     reason: subscriptionFormData.reason || 'Admin tarafından iptal edildi'
                 }
@@ -643,8 +641,8 @@ const UserManagement = () => {
     // Abonelik geçmişi
     const handleShowSubscriptionHistory = async (user) => {
         try {
-            const response = await axios.get(
-                `${API_BASE_URL}/admin/subscriptions/users/${user._id}`
+            const response = await api.get(
+                `/admin/subscriptions/users/${user._id}`
             );
 
             if (response.data.success) {
