@@ -128,6 +128,19 @@ const AddMusic = () => {
     const [editArtistOptions, setEditArtistOptions] = useState([]);
     const [editArtistSearch, setEditArtistSearch] = useState('');
 
+    // ⭐ SPOTIFY INTEGRATION STATES
+    const [spotifyLink, setSpotifyLink] = useState('');
+    const [spotifyLoading, setSpotifyLoading] = useState(false);
+    const [spotifyFetched, setSpotifyFetched] = useState(false);
+    const [spotifyError, setSpotifyError] = useState(null);
+    const [spotifyArtistName, setSpotifyArtistName] = useState('');
+
+    // ⭐ ARTIST MATCHING STATES (Sanatci eslestirme)
+    const [artistMatchResults, setArtistMatchResults] = useState([]); // check-artists-batch sonuclari
+    const [artistSelections, setArtistSelections] = useState({}); // Admin'in secimleri: { artistName: selectedId }
+    const [showArtistMatchDialog, setShowArtistMatchDialog] = useState(false);
+    const [artistMatchLoading, setArtistMatchLoading] = useState(false);
+
     const platformConfig = {
         spotify: {
             label: 'Spotify',
@@ -159,6 +172,258 @@ const AddMusic = () => {
             color: '#FF8800',
             placeholder: 'https://soundcloud.com/...'
         }
+    };
+
+    // ========== ⭐ SPOTIFY INTEGRATION FUNCTIONS ⭐ ==========
+
+    // Spotify track URL'i mi kontrol et (query params ve intl-xx dahil)
+    const isValidSpotifyTrackUrl = (url) => {
+        if (!url) return false;
+        // /intl-tr/, /intl-en/ gibi dil prefix'lerini ve ?si=xxx parametrelerini de kabul et
+        const trackRegex = /^https?:\/\/open\.spotify\.com\/(intl-[a-z]{2}\/)?track\/[a-zA-Z0-9]+/i;
+        const uriRegex = /^spotify:track:[a-zA-Z0-9]+/i;
+        const trimmedUrl = url.trim();
+        return trackRegex.test(trimmedUrl) || uriRegex.test(trimmedUrl);
+    };
+
+    // Spotify track ID'sini çıkar
+    const extractSpotifyTrackId = (url) => {
+        if (!url) return null;
+        // URL'den query params'ı temizle ve track ID'yi al (intl-xx prefix'i dahil)
+        const urlRegex = /open\.spotify\.com\/(intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/;
+        const uriRegex = /spotify:track:([a-zA-Z0-9]+)/;
+
+        let match = urlRegex.exec(url);
+        if (match) return match[2]; // intl prefix varsa group 2'de
+
+        match = uriRegex.exec(url);
+        if (match) return match[1];
+
+        return null;
+    };
+
+    // Spotify'dan metadata çek
+    const fetchSpotifyMetadata = async (spotifyUrl) => {
+        const trackId = extractSpotifyTrackId(spotifyUrl);
+        if (!trackId) {
+            setSpotifyError('Geçerli bir Spotify track linki girin');
+            return;
+        }
+
+        setSpotifyLoading(true);
+        setSpotifyError(null);
+
+        try {
+            console.log('🎵 Fetching Spotify metadata for track:', trackId);
+
+            // Admin token'ı al
+            const adminToken = localStorage.getItem('adminToken');
+            console.log('🔑 Admin token exists:', !!adminToken);
+
+            if (!adminToken) {
+                setSpotifyError('Oturum bulunamadı, lütfen tekrar giriş yapın');
+                setSpotifyLoading(false);
+                return;
+            }
+
+            const response = await axios.get(`${API_BASE_URL}/api/spotify/track/${trackId}`, {
+                headers: { Authorization: `Bearer ${adminToken}` }
+            });
+
+            console.log('📥 Spotify API response:', response.data);
+
+            if (response.data.success && response.data.data) {
+                const data = response.data.data;
+                // Spotify controller'dan gelen field'lar: name, artist, imageUrl
+                const trackName = data.name || data.title || '';
+                const artistName = data.artist || data.artistNames || '';
+                const imageUrl = data.imageUrl || '';
+
+                console.log('✅ Spotify metadata received:', { trackName, artistName, imageUrl });
+
+                // Form'u güncelle
+                setMusicForm(prev => {
+                    const newForm = {
+                        ...prev,
+                        title: trackName,
+                        platformLinks: {
+                            ...prev.platformLinks,
+                            spotify: spotifyUrl.trim()
+                        }
+                    };
+                    console.log('📝 Updated form:', newForm);
+                    return newForm;
+                });
+
+                // Spotify'dan gelen image'ı ayarla
+                if (imageUrl) {
+                    setImagePreview(imageUrl);
+                    imageDataRef.current = imageUrl;
+                    console.log('🖼️ Image set:', imageUrl);
+                }
+
+                // Artist adını sakla (artist seçimi için kullanılacak)
+                setSpotifyArtistName(artistName);
+                setSpotifyFetched(true);
+
+                // ⭐ Sanatci eslesmelerini kontrol et
+                if (artistName) {
+                    checkArtistsMatches(artistName);
+                }
+
+                setSuccess(`✅ Spotify'dan bilgiler alındı: "${trackName}" - ${artistName}`);
+            } else {
+                console.error('❌ Spotify API returned unsuccessful:', response.data);
+                setSpotifyError('Spotify\'dan veri alınamadı');
+            }
+        } catch (error) {
+            console.error('❌ Spotify metadata fetch error:', error);
+            console.error('❌ Error response:', error.response?.data);
+
+            if (error.response?.status === 401) {
+                setSpotifyError('Oturum süresi dolmuş, lütfen tekrar giriş yapın');
+            } else if (error.response?.status === 404) {
+                setSpotifyError('Şarkı Spotify\'da bulunamadı');
+            } else {
+                setSpotifyError(`Spotify bilgileri alınamadı: ${error.response?.data?.message || error.message}`);
+            }
+        } finally {
+            setSpotifyLoading(false);
+        }
+    };
+
+    // Spotify linki değiştiğinde
+    const handleSpotifyLinkChange = (e) => {
+        const link = e.target.value;
+        setSpotifyLink(link);
+        setSpotifyError(null);
+
+        console.log('🔗 Spotify link changed:', link);
+        console.log('🔗 Is valid:', isValidSpotifyTrackUrl(link));
+
+        // Geçerli bir link ise otomatik fetch
+        if (isValidSpotifyTrackUrl(link) && !spotifyLoading) {
+            console.log('🚀 Triggering Spotify fetch...');
+            fetchSpotifyMetadata(link);
+        } else if (link && !isValidSpotifyTrackUrl(link)) {
+            setSpotifyFetched(false);
+        }
+    };
+
+    // Paste event handler - yapıştırma anında tetiklenir
+    const handleSpotifyPaste = (e) => {
+        // Paste edilen içeriği al
+        const pastedText = e.clipboardData.getData('text');
+        console.log('📋 Pasted text:', pastedText);
+        console.log('📋 Trimmed:', pastedText.trim());
+
+        const trimmedText = pastedText.trim();
+
+        if (isValidSpotifyTrackUrl(trimmedText)) {
+            e.preventDefault(); // Default paste'i engelle
+            console.log('✅ Valid Spotify link pasted, fetching...');
+            setSpotifyLink(trimmedText);
+            setSpotifyError(null);
+            // Direkt fetch et
+            fetchSpotifyMetadata(trimmedText);
+        } else {
+            console.log('❌ Invalid Spotify link:', trimmedText);
+            console.log('❌ Regex test result:', /^https?:\/\/open\.spotify\.com\/track\/[a-zA-Z0-9]+/i.test(trimmedText));
+        }
+    };
+
+    // Spotify verilerini temizle
+    const clearSpotifyData = () => {
+        setSpotifyLink('');
+        setSpotifyFetched(false);
+        setSpotifyError(null);
+        setSpotifyArtistName('');
+        setMusicForm(prev => ({
+            ...prev,
+            title: '',
+            artists: [],
+            platformLinks: {
+                ...prev.platformLinks,
+                spotify: ''
+            }
+        }));
+        setImagePreview(null);
+        imageDataRef.current = null;
+        // Artist matching state'lerini de temizle
+        setArtistMatchResults([]);
+        setArtistSelections({});
+    };
+
+    // ========== ARTIST MATCHING FUNCTIONS ==========
+    // Sanatci isimlerini kontrol et ve eslesmeler varsa dialog goster
+    const checkArtistsMatches = async (artistNamesString) => {
+        if (!artistNamesString || artistNamesString.trim().length < 2) return;
+
+        // Sanatci isimlerini virgul ile ayir
+        const artistNames = artistNamesString.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
+        if (artistNames.length === 0) return;
+
+        console.log('🔍 Checking artist matches for:', artistNames);
+        setArtistMatchLoading(true);
+
+        try {
+            const adminToken = localStorage.getItem('adminToken');
+            const response = await axios.post(
+                `${API_BASE_URL}/api/music/check-artists-batch`,
+                { artistNames },
+                { headers: { Authorization: `Bearer ${adminToken}` } }
+            );
+
+            console.log('📋 Artist match response:', response.data);
+
+            if (response.data.success) {
+                setArtistMatchResults(response.data.results);
+
+                // Eslesmeler varsa dialog goster
+                if (response.data.hasAnyMatches) {
+                    setShowArtistMatchDialog(true);
+                    // Varsayilan secimleri ayarla (ilk eslesen veya yeni olustur)
+                    const defaultSelections = {};
+                    response.data.results.forEach(result => {
+                        if (result.hasMatches && result.matches.length > 0) {
+                            // Ilk eslesen artist'i varsayilan sec
+                            defaultSelections[result.searchName] = result.matches[0].id;
+                        } else {
+                            // Esleme yok, yeni olusturulacak
+                            defaultSelections[result.searchName] = null;
+                        }
+                    });
+                    setArtistSelections(defaultSelections);
+                } else {
+                    // Esleme yok, tum sanatcilar yeni olusturulacak
+                    const defaultSelections = {};
+                    response.data.results.forEach(result => {
+                        defaultSelections[result.searchName] = null;
+                    });
+                    setArtistSelections(defaultSelections);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Artist match check error:', error);
+            // Hata durumunda devam et, sanatcilar otomatik olusturulacak
+        } finally {
+            setArtistMatchLoading(false);
+        }
+    };
+
+    // Artist secim dialogunu kapat ve secimleri onayla
+    const handleArtistMatchConfirm = () => {
+        setShowArtistMatchDialog(false);
+        console.log('✅ Artist selections confirmed:', artistSelections);
+    };
+
+    // Tek bir sanatci icin secim degistir
+    const handleArtistSelectionChange = (artistName, selectedId) => {
+        setArtistSelections(prev => ({
+            ...prev,
+            [artistName]: selectedId
+        }));
     };
 
     // ========== GENRE FETCH ==========
@@ -496,12 +761,21 @@ const AddMusic = () => {
     };
 
     const validateForm = () => {
-        if (!musicForm.title.trim()) {
-            setError('Şarkı adı gereklidir');
+        // ⭐ Spotify'dan fetch edildiyse title otomatik gelmiş demektir
+        if (!musicForm.title.trim() && !spotifyFetched) {
+            setError('Şarkı adı gereklidir - Spotify linki yapıştırın veya manuel girin');
             return false;
         }
-        if (musicForm.artists.length === 0) {
-            setError('En az bir artist seçmelisiniz');
+
+        // Spotify fetch edildi ama title boşsa (API sorunu olabilir)
+        if (!musicForm.title.trim() && spotifyFetched) {
+            setError('Spotify\'dan şarkı adı alınamadı, lütfen tekrar deneyin');
+            return false;
+        }
+
+        // ⭐ Spotify'dan artist geldiyse veya manuel seçildiyse OK
+        if (musicForm.artists.length === 0 && !spotifyArtistName) {
+            setError('En az bir artist seçmelisiniz veya Spotify linki girin');
             return false;
         }
         // FIX: Ref'i de kontrol et
@@ -514,9 +788,10 @@ const AddMusic = () => {
             return false;
         }
 
-        const hasLink = Object.values(musicForm.platformLinks).some(link => link.trim() !== '');
-        if (!hasLink) {
-            setError('En az bir platform linki eklenmelidir');
+        // ⭐ Spotify linki zorunlu
+        const hasSpotifyLink = musicForm.platformLinks.spotify && musicForm.platformLinks.spotify.trim() !== '';
+        if (!hasSpotifyLink) {
+            setError('Spotify linki zorunludur');
             return false;
         }
 
@@ -547,9 +822,28 @@ const AddMusic = () => {
                 return;
             }
 
+            // ⭐ Artist listesini hazırla - Spotify'dan gelen artist'i ekle
+            let artistNames = musicForm.artists.map(a => a.name);
+
+            // Eğer Spotify'dan artist geldiyse ve listede yoksa ekle
+            if (spotifyArtistName && !artistNames.some(name =>
+                name.toLowerCase() === spotifyArtistName.toLowerCase()
+            )) {
+                // Spotify'dan gelen artist virgülle ayrılmış olabilir
+                const spotifyArtists = spotifyArtistName.split(',').map(n => n.trim()).filter(n => n);
+                artistNames = [...spotifyArtists, ...artistNames];
+            }
+
+            // ⭐ Artist seçimlerini hazırla (backend'e gönderilecek)
+            const artistSelectionsArray = Object.entries(artistSelections).map(([name, selectedId]) => ({
+                name: name,
+                selectedId: selectedId // null ise yeni oluşturulacak
+            }));
+
             const submitData = {
                 title: musicForm.title.trim(),
-                artists: musicForm.artists.map(a => a.name),
+                artists: artistNames,
+                artistSelections: artistSelectionsArray.length > 0 ? artistSelectionsArray : undefined,
                 imageUrl: finalImageUrl,
                 genre: musicForm.genre,
                 isFeatured: musicForm.isFeatured,
@@ -558,7 +852,12 @@ const AddMusic = () => {
                 )
             };
 
-            console.log('📤 Submitting music:', { ...submitData, imageUrl: `[base64 ${submitData.imageUrl.length} chars]` });
+            console.log('📤 Submitting music:', {
+                ...submitData,
+                imageUrl: `[${submitData.imageUrl.length} chars]`,
+                spotifyArtist: spotifyArtistName,
+                artistSelections: artistSelectionsArray
+            });
 
             await axios.post(`${API_BASE_URL}/api/music`, submitData);
             setSuccess('Müzik başarıyla eklendi! 🎵');
@@ -676,6 +975,15 @@ const AddMusic = () => {
         setActiveTab(0);
         setUploadProgress(0);
         setArtistSearch('');
+        // ⭐ Spotify verilerini temizle
+        setSpotifyLink('');
+        setSpotifyFetched(false);
+        setSpotifyError(null);
+        setSpotifyArtistName('');
+        // ⭐ Artist matching state'lerini temizle
+        setArtistMatchResults([]);
+        setArtistSelections({});
+        setShowArtistMatchDialog(false);
     };
 
     const filteredMusic = musicList.filter(music => {
@@ -918,28 +1226,105 @@ const AddMusic = () => {
                                 {/* Tab 0: Temel Bilgiler */}
                                 {activeTab === 0 && (
                                     <Stack spacing={3}>
-                                        <TextField
-                                            fullWidth label="Şarkı Adı" name="title"
-                                            value={musicForm.title} onChange={handleInputChange}
-                                            required placeholder="Örn: Sunset Dreams"
-                                        />
-
+                                        {/* ⭐ SPOTIFY LINK - EN ÜSTTE */}
                                         <Box>
-                                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                                Artistler * (Birden fazla seçebilirsiniz)
+                                            <Typography variant="body2" color="text.secondary" mb={1}>
+                                                Spotify linkini yapıştırın
                                             </Typography>
-                                            <ArtistSelectComponent
-                                                value={musicForm.artists}
-                                                onChange={handleArtistSelect}
-                                                onRemove={handleRemoveArtist}
-                                                options={artistOptions}
-                                                loading={artistsLoading}
-                                                onInputChange={setArtistSearch}
-                                                inputValue={artistSearch}
-                                                placeholder="Artist ara veya seç..."
-                                                onCreateNew={() => setShowNewArtistDialog(true)}
+
+                                            <TextField
+                                                fullWidth
+                                                value={spotifyLink}
+                                                onChange={handleSpotifyLinkChange}
+                                                onPaste={handleSpotifyPaste}
+                                                placeholder="https://open.spotify.com/track/..."
+                                                error={!!spotifyError}
+                                                helperText={spotifyError}
+                                                disabled={spotifyLoading}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <SpotifyIcon sx={{ color: '#1DB954' }} />
+                                                        </InputAdornment>
+                                                    ),
+                                                    endAdornment: spotifyLoading ? (
+                                                        <InputAdornment position="end">
+                                                            <CircularProgress size={20} sx={{ color: '#1DB954' }} />
+                                                        </InputAdornment>
+                                                    ) : spotifyFetched ? (
+                                                        <InputAdornment position="end">
+                                                            <CheckIcon sx={{ color: '#1DB954' }} />
+                                                        </InputAdornment>
+                                                    ) : null
+                                                }}
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: '#1DB954',
+                                                        },
+                                                    },
+                                                }}
                                             />
+
+                                            {spotifyFetched && (
+                                                <Box mt={2}>
+                                                    <Paper sx={{ p: 2, bgcolor: 'rgba(29, 185, 84, 0.1)', border: '2px solid #1DB954' }}>
+                                                        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                                                            <Typography variant="subtitle1" fontWeight="bold" color="#1DB954">
+                                                                ✓ Spotify'dan Alındı
+                                                            </Typography>
+                                                            <Button size="small" onClick={clearSpotifyData} color="error" variant="outlined">
+                                                                Temizle
+                                                            </Button>
+                                                        </Box>
+                                                        <Box display="flex" gap={2}>
+                                                            {imagePreview && (
+                                                                <Box
+                                                                    component="img"
+                                                                    src={imagePreview}
+                                                                    alt="Cover"
+                                                                    sx={{ width: 80, height: 80, borderRadius: 1, objectFit: 'cover' }}
+                                                                />
+                                                            )}
+                                                            <Box>
+                                                                <Typography variant="h6" fontWeight="bold">
+                                                                    {musicForm.title}
+                                                                </Typography>
+                                                                <Typography variant="body1" color="text.secondary">
+                                                                    {spotifyArtistName}
+                                                                </Typography>
+                                                                {artistMatchLoading ? (
+                                                                    <Box display="flex" alignItems="center" gap={1} mt={1}>
+                                                                        <CircularProgress size={14} />
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            Sanatçı eşleşmeleri kontrol ediliyor...
+                                                                        </Typography>
+                                                                    </Box>
+                                                                ) : artistMatchResults.some(r => r.hasMatches) ? (
+                                                                    <Box mt={1}>
+                                                                        <Button
+                                                                            size="small"
+                                                                            variant="outlined"
+                                                                            color="primary"
+                                                                            startIcon={<GroupIcon />}
+                                                                            onClick={() => setShowArtistMatchDialog(true)}
+                                                                            sx={{ textTransform: 'none' }}
+                                                                        >
+                                                                            Eşleşme bulundu - Sanatçı seç
+                                                                        </Button>
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                                                        {artistMatchResults.length > 0 ? 'Yeni sanatçı oluşturulacak' : 'Sanatçı sistemde yoksa otomatik oluşturulacak'}
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                        </Box>
+                                                    </Paper>
+                                                </Box>
+                                            )}
                                         </Box>
+
 
                                         <FormControl fullWidth>
                                             <InputLabel>Tür</InputLabel>
@@ -987,16 +1372,35 @@ const AddMusic = () => {
                                 {activeTab === 1 && (
                                     <Stack spacing={3}>
                                         <Alert severity="info" icon={<LinkIcon />}>
-                                            En az bir platform linki eklemeniz gerekir.
+                                            Spotify linki zorunludur. Diğer platform linkleri opsiyoneldir.
                                         </Alert>
 
                                         {Object.entries(platformConfig).map(([key, config]) => (
                                             <TextField
-                                                key={key} fullWidth label={config.label}
+                                                key={key}
+                                                fullWidth
+                                                label={key === 'spotify' ? `${config.label} (Zorunlu)` : config.label}
                                                 value={musicForm.platformLinks[key]}
                                                 onChange={(e) => handlePlatformLinkChange(key, e.target.value)}
                                                 placeholder={config.placeholder}
-                                                InputProps={{ startAdornment: <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box> }}
+                                                disabled={key === 'spotify' && spotifyFetched}
+                                                required={key === 'spotify'}
+                                                InputProps={{
+                                                    startAdornment: <Box sx={{ mr: 1, color: config.color }}>{config.icon}</Box>,
+                                                    endAdornment: key === 'spotify' && spotifyFetched && (
+                                                        <InputAdornment position="end">
+                                                            <Tooltip title="Spotify'dan otomatik alındı">
+                                                                <CheckIcon sx={{ color: '#1DB954' }} />
+                                                            </Tooltip>
+                                                        </InputAdornment>
+                                                    )
+                                                }}
+                                                sx={key === 'spotify' ? {
+                                                    '& .MuiOutlinedInput-root': {
+                                                        '& fieldset': { borderColor: '#1DB954' },
+                                                        '&:hover fieldset': { borderColor: '#1DB954' },
+                                                    }
+                                                } : {}}
                                             />
                                         ))}
 
@@ -1030,23 +1434,64 @@ const AddMusic = () => {
                                 {/* Tab 2: Image */}
                                 {activeTab === 2 && (
                                     <Stack spacing={3}>
-                                        <DragDropImageUpload
-                                            preview={imagePreview} isDragging={isDragging} uploadProgress={uploadProgress}
-                                            onDragEnter={handleDragEnter} onDragLeave={handleDragLeave}
-                                            onDragOver={handleDragOver} onDrop={handleDrop}
-                                            onFileSelect={handleImageChange} onRemove={handleRemoveImage}
-                                            inputId="image-upload"
-                                        />
+                                        {/* ⭐ Spotify'dan gelen görsel */}
+                                        {spotifyFetched && imagePreview && (
+                                            <Paper
+                                                sx={{
+                                                    p: 2,
+                                                    bgcolor: 'rgba(29, 185, 84, 0.1)',
+                                                    border: '2px solid #1DB954',
+                                                    borderRadius: 2
+                                                }}
+                                            >
+                                                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                                                    <SpotifyIcon sx={{ color: '#1DB954' }} />
+                                                    <Typography variant="subtitle1" fontWeight="bold" color="#1DB954">
+                                                        Spotify'dan Alınan Kapak Resmi
+                                                    </Typography>
+                                                    <CheckIcon sx={{ color: '#1DB954' }} />
+                                                </Box>
+                                                <Box display="flex" justifyContent="center">
+                                                    <Box
+                                                        component="img"
+                                                        src={imagePreview}
+                                                        sx={{
+                                                            width: 200,
+                                                            height: 200,
+                                                            objectFit: 'cover',
+                                                            borderRadius: 2,
+                                                            border: '3px solid #1DB954'
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Typography variant="caption" color="text.secondary" textAlign="center" display="block" mt={1}>
+                                                    Bu görsel Spotify'dan otomatik alındı
+                                                </Typography>
+                                            </Paper>
+                                        )}
 
-                                        <Divider>VEYA</Divider>
+                                        {/* Manuel görsel yükleme - Spotify'dan gelmemişse göster */}
+                                        {!spotifyFetched && (
+                                            <>
+                                                <DragDropImageUpload
+                                                    preview={imagePreview} isDragging={isDragging} uploadProgress={uploadProgress}
+                                                    onDragEnter={handleDragEnter} onDragLeave={handleDragLeave}
+                                                    onDragOver={handleDragOver} onDrop={handleDrop}
+                                                    onFileSelect={handleImageChange} onRemove={handleRemoveImage}
+                                                    inputId="image-upload"
+                                                />
 
-                                        <TextField
-                                            fullWidth label="Görsel URL" name="imageUrl"
-                                            value={musicForm.imageUrl} onChange={handleInputChange}
-                                            placeholder="https://example.com/image.jpg"
-                                            helperText="Harici bir görsel linki girebilirsiniz"
-                                            disabled={!!imagePreview}
-                                        />
+                                                <Divider>VEYA</Divider>
+
+                                                <TextField
+                                                    fullWidth label="Görsel URL" name="imageUrl"
+                                                    value={musicForm.imageUrl} onChange={handleInputChange}
+                                                    placeholder="https://example.com/image.jpg"
+                                                    helperText="Harici bir görsel linki girebilirsiniz"
+                                                    disabled={!!imagePreview}
+                                                />
+                                            </>
+                                        )}
 
                                         {imageFile && (
                                             <Alert severity="info" icon={<CheckIcon />}>
@@ -1362,6 +1807,95 @@ const AddMusic = () => {
                         sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}
                     >
                         {creatingArtist ? 'Oluşturuluyor...' : 'Oluştur ve Ekle'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ⭐ Artist Match Dialog - Sanatci Eslestirme */}
+            <Dialog open={showArtistMatchDialog} onClose={() => setShowArtistMatchDialog(false)} maxWidth="md" fullWidth>
+                <DialogTitle sx={{ bgcolor: '#7C3AED', color: '#fff' }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <GroupIcon />
+                        Sanatçı Eşleştirme
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Alert severity="info" sx={{ mb: 3 }}>
+                        Spotify'dan gelen sanatçı isimleri için mevcut eşleşmeler bulundu.
+                        Her sanatçı için mevcut bir profil seçebilir veya yeni oluşturulmasını sağlayabilirsiniz.
+                    </Alert>
+
+                    {artistMatchLoading ? (
+                        <Box display="flex" justifyContent="center" p={4}>
+                            <CircularProgress />
+                        </Box>
+                    ) : (
+                        <Stack spacing={3}>
+                            {artistMatchResults.map((result, index) => (
+                                <Paper key={index} sx={{ p: 2, bgcolor: result.hasMatches ? 'rgba(124, 58, 237, 0.05)' : 'rgba(0,0,0,0.02)' }}>
+                                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                        {result.searchName}
+                                        {result.hasMatches && (
+                                            <Chip
+                                                label={`${result.matches.length} eşleşme`}
+                                                size="small"
+                                                color="primary"
+                                                sx={{ ml: 1 }}
+                                            />
+                                        )}
+                                    </Typography>
+
+                                    {result.hasMatches ? (
+                                        <FormControl fullWidth size="small" sx={{ mt: 1 }}>
+                                            <InputLabel>Sanatçı Seç</InputLabel>
+                                            <Select
+                                                value={artistSelections[result.searchName] || ''}
+                                                label="Sanatçı Seç"
+                                                onChange={(e) => handleArtistSelectionChange(result.searchName, e.target.value || null)}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>🆕 Yeni Oluştur: "{result.suggestedSlug}"</em>
+                                                </MenuItem>
+                                                {result.matches.map((match) => (
+                                                    <MenuItem key={match.id} value={match.id}>
+                                                        <Box display="flex" alignItems="center" gap={1}>
+                                                            {match.profileImage ? (
+                                                                <Avatar src={match.profileImage} sx={{ width: 24, height: 24 }} />
+                                                            ) : (
+                                                                <Avatar sx={{ width: 24, height: 24, bgcolor: '#7C3AED' }}>
+                                                                    {match.name?.charAt(0)}
+                                                                </Avatar>
+                                                            )}
+                                                            <span>{match.displayName}</span>
+                                                            {match.type === 'artist' && match.claimed && (
+                                                                <CheckIcon sx={{ color: '#7C3AED', fontSize: 16 }} />
+                                                            )}
+                                                        </Box>
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            Eşleşme bulunamadı. Yeni sanatçı oluşturulacak: <strong>{result.suggestedSlug}</strong>
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            ))}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setShowArtistMatchDialog(false)}>
+                        İptal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleArtistMatchConfirm}
+                        startIcon={<CheckIcon />}
+                        sx={{ bgcolor: '#7C3AED', '&:hover': { bgcolor: '#6D28D9' } }}
+                    >
+                        Seçimleri Onayla
                     </Button>
                 </DialogActions>
             </Dialog>
