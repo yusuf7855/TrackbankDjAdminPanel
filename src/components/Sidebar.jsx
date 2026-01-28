@@ -42,7 +42,9 @@ import {
     CardMembership as SubscriptionIcon,
     Star as PremiumIcon,
     SupportAgent as SupportIcon,
-    Build as MaintenanceIcon
+    Build as MaintenanceIcon,
+    Apple as AppleIcon,
+    AttachMoney as RevenueIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -120,6 +122,26 @@ const menuItems = [
         icon: <SubscriptionIcon />,
         path: '/admin/subscriptions',
         description: 'Trial & Premium Yönetimi',
+        badge: null,
+        badgeColor: 'success'
+    },
+    // Apple Bildirimleri
+    {
+        id: 'apple-notifications',
+        title: 'Apple Bildirimleri',
+        icon: <AppleIcon />,
+        path: '/admin/apple-notifications',
+        description: 'App Store Webhook Logları',
+        badge: 'NEW',
+        badgeColor: 'info'
+    },
+    // Gelir Takibi
+    {
+        id: 'revenue',
+        title: 'Gelir Takibi',
+        icon: <RevenueIcon />,
+        path: '/admin/revenue',
+        description: 'Abonelik Gelirleri',
         badge: 'NEW',
         badgeColor: 'success'
     },

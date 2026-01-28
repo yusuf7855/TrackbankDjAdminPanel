@@ -23,6 +23,8 @@ import GenreManagement from "./pages/GenreManagement.jsx";
 import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";
 import SupportTickets from "./pages/SupportTickets.jsx";
 import Maintenance from "./pages/Maintenance.jsx";
+import AppleNotifications from "./pages/AppleNotifications.jsx";
+import Revenue from "./pages/Revenue.jsx";
 
 // Modern tema oluştur
 const theme = createTheme({
@@ -181,6 +183,8 @@ function App() {
                                 <Route path="admin/artists" element={<ArtistManagement />} />
                                 <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
                                 <Route path="admin/subscriptions" element={<SubscriptionManagement />} />
+                                <Route path="admin/apple-notifications" element={<AppleNotifications />} />
+                                <Route path="admin/revenue" element={<Revenue />} />
                                 <Route path="admin/support" element={<SupportTickets />} />
                                 <Route path="admin/maintenance" element={<Maintenance />} />
                                 <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
@@ -203,6 +207,8 @@ function App() {
                                 <Route path="users" element={<UserManagement />} />
                                 <Route path="genres" element={<GenreManagement />} />
                                 <Route path="subscriptions" element={<SubscriptionManagement />} />
+                                <Route path="apple-notifications" element={<AppleNotifications />} />
+                                <Route path="revenue" element={<Revenue />} />
                                 <Route path="support" element={<SupportTickets />} />
                                 <Route path="artist-essential" element={<ArtistEssentialApproval />} />
 

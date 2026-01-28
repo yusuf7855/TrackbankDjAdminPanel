@@ -137,7 +137,7 @@ const AddMusic = () => {
 
     // ⭐ ARTIST MATCHING STATES (Sanatci eslestirme)
     const [artistMatchResults, setArtistMatchResults] = useState([]); // check-artists-batch sonuclari
-    const [artistSelections, setArtistSelections] = useState({}); // Admin'in secimleri: { artistName: selectedId }
+    const [artistSelections, setArtistSelections] = useState({}); // Admin'in secimleri: { artistName: artistId }
     const [showArtistMatchDialog, setShowArtistMatchDialog] = useState(false);
     const [artistMatchLoading, setArtistMatchLoading] = useState(false);
 
@@ -422,7 +422,7 @@ const AddMusic = () => {
     const handleArtistSelectionChange = (artistName, selectedId) => {
         setArtistSelections(prev => ({
             ...prev,
-            [artistName]: selectedId
+            [artistName]: selectedId || null
         }));
     };
 
@@ -837,7 +837,7 @@ const AddMusic = () => {
             // ⭐ Artist seçimlerini hazırla (backend'e gönderilecek)
             const artistSelectionsArray = Object.entries(artistSelections).map(([name, selectedId]) => ({
                 name: name,
-                selectedId: selectedId // null ise yeni oluşturulacak
+                selectedId: selectedId || null
             }));
 
             const submitData = {
@@ -1851,7 +1851,9 @@ const AddMusic = () => {
                                             <Select
                                                 value={artistSelections[result.searchName] || ''}
                                                 label="Sanatçı Seç"
-                                                onChange={(e) => handleArtistSelectionChange(result.searchName, e.target.value || null)}
+                                                onChange={(e) => {
+                                                    handleArtistSelectionChange(result.searchName, e.target.value || null);
+                                                }}
                                             >
                                                 <MenuItem value="">
                                                     <em>🆕 Yeni Oluştur: "{result.suggestedSlug}"</em>
@@ -1867,7 +1869,7 @@ const AddMusic = () => {
                                                                 </Avatar>
                                                             )}
                                                             <span>{match.displayName}</span>
-                                                            {match.type === 'artist' && match.claimed && (
+                                                            {match.claimed && (
                                                                 <CheckIcon sx={{ color: '#7C3AED', fontSize: 16 }} />
                                                             )}
                                                         </Box>

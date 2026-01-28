@@ -53,7 +53,9 @@ import {
     Schedule as TrialIcon,
     Warning as WarningIcon,
     RestartAlt as ResetIcon,
-    AccessTime as AccessTimeIcon
+    AccessTime as AccessTimeIcon,
+    Apple as AppleIcon,
+    ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -271,6 +273,7 @@ export default function SubscriptionManagement() {
     const [revokeDialog, setRevokeDialog] = useState({ open: false, user: null });
     const [historyDialog, setHistoryDialog] = useState({ open: false, user: null, history: [] });
     const [trialDialog, setTrialDialog] = useState({ open: false, user: null });
+    const [grantTrialDialog, setGrantTrialDialog] = useState({ open: false, user: null });
 
     // Form states
     const [grantDuration, setGrantDuration] = useState(30);
@@ -279,6 +282,9 @@ export default function SubscriptionManagement() {
     const [extendDays, setExtendDays] = useState(30);
     const [extendReason, setExtendReason] = useState('');
     const [revokeReason, setRevokeReason] = useState('');
+    const [trialDays, setTrialDays] = useState(7);
+    const [trialHours, setTrialHours] = useState(0);
+    const [trialMinutes, setTrialMinutes] = useState(0);
 
     // Snackbar
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -440,6 +446,37 @@ export default function SubscriptionManagement() {
             if (response.data.success) {
                 showSnackbar('Deneme süresi sıfırlandı (7 gün verildi)');
                 setTrialDialog({ open: false, user: null });
+                loadUsers();
+                loadStats();
+            }
+        } catch (error) {
+            showSnackbar(error.response?.data?.message || 'İşlem başarısız', 'error');
+        }
+    };
+
+    // Özel Deneme Süresi Ver
+    const handleGrantTrial = async () => {
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/admin/subscriptions/users/${grantTrialDialog.user._id}/grant-trial`,
+                {
+                    days: trialDays,
+                    hours: trialHours,
+                    minutes: trialMinutes,
+                    reason: 'Admin tarafından deneme süresi verildi'
+                }
+            );
+
+            if (response.data.success) {
+                const totalTime = [];
+                if (trialDays > 0) totalTime.push(`${trialDays} gün`);
+                if (trialHours > 0) totalTime.push(`${trialHours} saat`);
+                if (trialMinutes > 0) totalTime.push(`${trialMinutes} dakika`);
+                showSnackbar(`Deneme süresi verildi: ${totalTime.join(', ')}`);
+                setGrantTrialDialog({ open: false, user: null });
+                setTrialDays(7);
+                setTrialHours(0);
+                setTrialMinutes(0);
                 loadUsers();
                 loadStats();
             }
@@ -613,6 +650,7 @@ export default function SubscriptionManagement() {
                             <TableCell><strong>Kullanıcı</strong></TableCell>
                             <TableCell><strong>Durum</strong></TableCell>
                             <TableCell><strong>Abonelik Türü</strong></TableCell>
+                            <TableCell><strong>Apple ID</strong></TableCell>
                             <TableCell><strong>Bitiş Tarihi</strong></TableCell>
                             <TableCell><strong>Kalan Süre</strong></TableCell>
                             <TableCell align="right"><strong>İşlemler</strong></TableCell>
@@ -621,7 +659,7 @@ export default function SubscriptionManagement() {
                     <TableBody>
                         {users.length === 0 && !loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                     <Typography color="textSecondary">
                                         Kullanıcı bulunamadı
                                     </Typography>
@@ -630,7 +668,10 @@ export default function SubscriptionManagement() {
                         ) : (
                             users.map((user) => {
                                 const status = getUserStatus(user);
-                                const endDate = user.subscription.endDate || user.subscription.trialEndDate;
+                                // Trial durumunda trialEndDate, premium durumunda endDate kullan
+                                const endDate = (status === 'trial_active' || status === 'trial')
+                                    ? user.subscription.trialEndDate
+                                    : (user.subscription.endDate || user.subscription.trialEndDate);
                                 const timeRemaining = calculateTimeRemaining(endDate);
 
                                 return (
@@ -661,6 +702,28 @@ export default function SubscriptionManagement() {
                                                             user.subscription.type === 'trial' ? 'Deneme' :
                                                                 user.subscription.grantedByAdmin ? 'Admin' : 'Deneme'}
                                             </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            {user.subscription.originalTransactionId ? (
+                                                <Tooltip title={`Apple Transaction ID: ${user.subscription.originalTransactionId}`}>
+                                                    <Chip
+                                                        icon={<AppleIcon sx={{ fontSize: 16 }} />}
+                                                        label={user.subscription.originalTransactionId.substring(0, 8) + '...'}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(user.subscription.originalTransactionId);
+                                                            showSnackbar('Apple ID kopyalandı', 'info');
+                                                        }}
+                                                        sx={{
+                                                            cursor: 'pointer',
+                                                            '&:hover': { bgcolor: 'action.hover' }
+                                                        }}
+                                                    />
+                                                </Tooltip>
+                                            ) : (
+                                                <Typography variant="body2" color="textSecondary">-</Typography>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="body2">
@@ -709,8 +772,8 @@ export default function SubscriptionManagement() {
                                                     </Tooltip>
                                                 )}
 
-                                                {/* Trial Sıfırla - sadece süresi dolmuşlara */}
-                                                {status === 'expired' && (
+                                                {/* Trial Sıfırla - süresi dolmuş veya trial durumunda */}
+                                                {(status === 'expired' || status === 'trial_active') && (
                                                     <Tooltip title="Deneme Süresini Sıfırla (7 gün)">
                                                         <IconButton
                                                             size="small"
@@ -721,6 +784,17 @@ export default function SubscriptionManagement() {
                                                         </IconButton>
                                                     </Tooltip>
                                                 )}
+
+                                                {/* Özel Deneme Süresi Ver */}
+                                                <Tooltip title="Özel Deneme Süresi Ver">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="warning"
+                                                        onClick={() => setGrantTrialDialog({ open: true, user })}
+                                                    >
+                                                        <TimerIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
 
                                                 {/* Geçmiş */}
                                                 <Tooltip title="Geçmiş">
@@ -924,6 +998,82 @@ export default function SubscriptionManagement() {
                     <Button onClick={() => setTrialDialog({ open: false, user: null })}>İptal</Button>
                     <Button variant="contained" color="info" onClick={handleResetTrial} startIcon={<ResetIcon />}>
                         7 Gün Ver
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Grant Custom Trial Dialog - Özel Deneme Süresi Ver */}
+            <Dialog open={grantTrialDialog.open} onClose={() => setGrantTrialDialog({ open: false, user: null })} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ bgcolor: 'warning.main', color: 'white' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <TimerIcon />
+                        Deneme Süresi Tanımla
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    {grantTrialDialog.user && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            <strong>{grantTrialDialog.user.fullName}</strong> (@{grantTrialDialog.user.username}) kullanıcısına deneme süresi verilecek.
+                        </Alert>
+                    )}
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                        Deneme Süresi Belirle:
+                    </Typography>
+                    <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Gün"
+                                value={trialDays}
+                                onChange={(e) => setTrialDays(Math.max(0, parseInt(e.target.value) || 0))}
+                                InputProps={{
+                                    inputProps: { min: 0 }
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={4}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Saat"
+                                value={trialHours}
+                                onChange={(e) => setTrialHours(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                                InputProps={{
+                                    inputProps: { min: 0, max: 23 }
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={4}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Dakika"
+                                value={trialMinutes}
+                                onChange={(e) => setTrialMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                                InputProps={{
+                                    inputProps: { min: 0, max: 59 }
+                                }}
+                            />
+                        </Grid>
+                    </Grid>
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                        Toplam süre: <strong>{trialDays} gün, {trialHours} saat, {trialMinutes} dakika</strong>
+                    </Alert>
+                    <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                        Not: Sandbox testleri için kısa süreler (5-10 dakika) kullanabilirsiniz.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setGrantTrialDialog({ open: false, user: null })}>İptal</Button>
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={handleGrantTrial}
+                        startIcon={<TimerIcon />}
+                        disabled={trialDays === 0 && trialHours === 0 && trialMinutes === 0}
+                    >
+                        Deneme Süresi Ver
                     </Button>
                 </DialogActions>
             </Dialog>
