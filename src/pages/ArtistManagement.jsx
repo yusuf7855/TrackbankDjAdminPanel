@@ -193,7 +193,7 @@ const ArtistManagement = () => {
 
     const loadPendingClaims = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/artists/claims/pending`, getAuthHeaders());
+            const response = await axios.get(`${API_BASE_URL}/claims/pending`, getAuthHeaders());
             setPendingClaims(response.data.data?.claims || []);
         } catch (error) {
             console.error('Claims yüklenemedi:', error);
@@ -479,7 +479,7 @@ const ArtistManagement = () => {
                 };
 
                 const response = await axios.put(
-                    `${API_BASE_URL}/artists/claims/${claim._id}/approve`,
+                    `${API_BASE_URL}/claims/${claim._id}/approve`,
                     requestData,
                     getAuthHeaders()
                 );
@@ -499,7 +499,7 @@ const ArtistManagement = () => {
                 }
 
                 await axios.put(
-                    `${API_BASE_URL}/artists/claims/${claim._id}/reject`,
+                    `${API_BASE_URL}/claims/${claim._id}/reject`,
                     { rejectionReason },
                     getAuthHeaders()
                 );
@@ -769,16 +769,16 @@ const ArtistManagement = () => {
                             <Grid item xs={12} md={6} key={claim._id}>
                                 <Card sx={{ height: '100%' }}>
                                     <CardContent>
-                                        {/* Artist Bilgisi */}
+                                        {/* Hedef Profil (Sanatçı) */}
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                                            <Avatar src={claim.artistId?.profileImage} sx={{ width: 64, height: 64 }}>
+                                            <Avatar src={claim.targetProfileId?.profileImage} sx={{ width: 64, height: 64 }}>
                                                 <ArtistIcon />
                                             </Avatar>
                                             <Box>
                                                 <Typography variant="h6" fontWeight="bold">
-                                                    {claim.artistId?.name}
+                                                    {claim.targetProfileId?.name}
                                                 </Typography>
-                                                <Chip label={`@${claim.artistId?.slug}`} size="small" />
+                                                <Chip label={`@${claim.targetProfileId?.username || claim.targetProfileId?.slug}`} size="small" />
                                             </Box>
                                         </Box>
 
@@ -789,15 +789,15 @@ const ArtistManagement = () => {
                                             Başvuran Kullanıcı
                                         </Typography>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                            <Avatar src={claim.userId?.profileImage} sx={{ width: 40, height: 40 }}>
+                                            <Avatar src={claim.claimantProfileId?.profileImage} sx={{ width: 40, height: 40 }}>
                                                 <PersonIcon />
                                             </Avatar>
                                             <Box>
                                                 <Typography fontWeight="bold">
-                                                    {claim.userId?.firstName} {claim.userId?.lastName}
+                                                    {claim.claimantUserId?.firstName} {claim.claimantUserId?.lastName}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    @{claim.userId?.username}
+                                                    @{claim.claimantProfileId?.username || claim.claimantUserId?.username}
                                                 </Typography>
                                             </Box>
                                         </Box>
@@ -806,11 +806,11 @@ const ArtistManagement = () => {
                                         <Box sx={{ bgcolor: '#f3f4f6', p: 2, borderRadius: 1, mb: 2 }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                                 <EmailIcon fontSize="small" color="action" />
-                                                <Typography variant="body2">{claim.userId?.email || 'Email yok'}</Typography>
+                                                <Typography variant="body2">{claim.claimantUserId?.email || 'Email yok'}</Typography>
                                             </Box>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <PhoneIcon fontSize="small" color="action" />
-                                                <Typography variant="body2">{claim.userId?.phone || 'Telefon yok'}</Typography>
+                                                <Typography variant="body2">{claim.claimantUserId?.phone || 'Telefon yok'}</Typography>
                                             </Box>
                                         </Box>
 

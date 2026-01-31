@@ -63,7 +63,8 @@ import {
     Close as CloseIcon,
     MicExternalOn as ArtistIcon,
     PersonAdd as PersonAddIcon,
-    Group as GroupIcon
+    Group as GroupIcon,
+    Label as LabelIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -97,6 +98,18 @@ const AddMusic = () => {
     const [showNewArtistDialog, setShowNewArtistDialog] = useState(false);
     const [newArtistName, setNewArtistName] = useState('');
     const [creatingArtist, setCreatingArtist] = useState(false);
+
+    // Label search state
+    const [labelSearch, setLabelSearch] = useState('');
+    const [labelOptions, setLabelOptions] = useState([]);
+    const [labelsLoading, setLabelsLoading] = useState(false);
+    const [selectedLabel, setSelectedLabel] = useState(null);
+
+    // Edit Label state
+    const [editLabelSearch, setEditLabelSearch] = useState('');
+    const [editLabelOptions, setEditLabelOptions] = useState([]);
+    const [editLabelsLoading, setEditLabelsLoading] = useState(false);
+    const [editSelectedLabel, setEditSelectedLabel] = useState(null);
 
     // Music list state
     const [musicList, setMusicList] = useState([]);
@@ -504,6 +517,69 @@ const AddMusic = () => {
         return () => clearTimeout(timer);
     }, [editArtistSearch, searchArtists, openEditDialog]);
 
+    // Label search function
+    const searchLabels = useCallback(async (query) => {
+        if (!query || query.length < 2) {
+            setLabelOptions([]);
+            return;
+        }
+
+        setLabelsLoading(true);
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/labels/search`, {
+                params: { q: query }
+            });
+
+            if (response.data.success) {
+                setLabelOptions(response.data.labels || []);
+            }
+        } catch (error) {
+            console.error('Label arama hatası:', error);
+        } finally {
+            setLabelsLoading(false);
+        }
+    }, []);
+
+    // Debounced label search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            searchLabels(labelSearch);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [labelSearch, searchLabels]);
+
+    // Edit Label search function
+    const searchEditLabels = useCallback(async (query) => {
+        if (!query || query.length < 2) {
+            setEditLabelOptions([]);
+            return;
+        }
+
+        setEditLabelsLoading(true);
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/labels/search`, {
+                params: { q: query }
+            });
+
+            if (response.data.success) {
+                setEditLabelOptions(response.data.labels || []);
+            }
+        } catch (error) {
+            console.error('Edit Label arama hatası:', error);
+        } finally {
+            setEditLabelsLoading(false);
+        }
+    }, []);
+
+    // Debounced edit label search
+    useEffect(() => {
+        if (!openEditDialog) return;
+        const timer = setTimeout(() => {
+            searchEditLabels(editLabelSearch);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [editLabelSearch, searchEditLabels, openEditDialog]);
+
     // Load initial data
     useEffect(() => {
         fetchGenres();
@@ -849,14 +925,18 @@ const AddMusic = () => {
                 isFeatured: musicForm.isFeatured,
                 platformLinks: Object.fromEntries(
                     Object.entries(musicForm.platformLinks).filter(([, value]) => value.trim() !== '')
-                )
+                ),
+                // Label - isim veya ID gönder
+                labelName: selectedLabel ? selectedLabel.name : (labelSearch.trim() || undefined),
+                labelId: selectedLabel?._id || undefined
             };
 
             console.log('📤 Submitting music:', {
                 ...submitData,
                 imageUrl: `[${submitData.imageUrl.length} chars]`,
                 spotifyArtist: spotifyArtistName,
-                artistSelections: artistSelectionsArray
+                artistSelections: artistSelectionsArray,
+                label: submitData.labelName || submitData.labelId || 'none'
             });
 
             await axios.post(`${API_BASE_URL}/api/music`, submitData);
@@ -881,6 +961,16 @@ const AddMusic = () => {
             });
         }
 
+        // Label bilgisini normalize et
+        let normalizedLabel = null;
+        if (music.labelId) {
+            if (typeof music.labelId === 'object') {
+                normalizedLabel = music.labelId;
+            } else {
+                normalizedLabel = { _id: music.labelId, name: music.labelName || 'Unknown Label' };
+            }
+        }
+
         setEditingMusic({
             ...music,
             artists: normalizedArtists,
@@ -896,6 +986,10 @@ const AddMusic = () => {
         editImageDataRef.current = music.imageUrl || null; // FIX: Mevcut image'ı ref'e yaz
         setEditImageFile(null);
         setEditArtistSearch('');
+        // Label edit state'lerini ayarla
+        setEditSelectedLabel(normalizedLabel);
+        setEditLabelSearch(normalizedLabel?.name || '');
+        setEditLabelOptions([]);
         setOpenEditDialog(true);
     };
 
@@ -922,7 +1016,10 @@ const AddMusic = () => {
                 isFeatured: editingMusic.isFeatured,
                 platformLinks: Object.fromEntries(
                     Object.entries(editingMusic.platformLinks || {}).filter(([, value]) => value?.trim() !== '')
-                )
+                ),
+                // Label bilgisi
+                labelName: editSelectedLabel ? editSelectedLabel.name : (editLabelSearch.trim() || undefined),
+                labelId: editSelectedLabel?._id || undefined
             };
 
             await axios.put(`${API_BASE_URL}/api/music/${editingMusic._id}`, updateData);
@@ -932,6 +1029,10 @@ const AddMusic = () => {
             setEditImagePreview(null);
             setEditImageFile(null);
             editImageDataRef.current = null;
+            // Edit label state'lerini temizle
+            setEditLabelSearch('');
+            setEditSelectedLabel(null);
+            setEditLabelOptions([]);
             await fetchMusic();
         } catch (error) {
             setError(error.response?.data?.message || 'Müzik güncellenirken hata oluştu');
@@ -984,6 +1085,10 @@ const AddMusic = () => {
         setArtistMatchResults([]);
         setArtistSelections({});
         setShowArtistMatchDialog(false);
+        // ⭐ Label state'lerini temizle
+        setLabelSearch('');
+        setSelectedLabel(null);
+        setLabelOptions([]);
     };
 
     const filteredMusic = musicList.filter(music => {
@@ -1325,6 +1430,84 @@ const AddMusic = () => {
                                             )}
                                         </Box>
 
+                                        {/* ⭐ LABEL SEÇİMİ */}
+                                        <Box>
+                                            <Autocomplete
+                                                freeSolo
+                                                options={labelOptions}
+                                                value={selectedLabel}
+                                                onChange={(event, newValue) => {
+                                                    if (typeof newValue === 'string') {
+                                                        setSelectedLabel(null);
+                                                        setLabelSearch(newValue);
+                                                    } else {
+                                                        setSelectedLabel(newValue);
+                                                        setLabelSearch(newValue?.name || '');
+                                                    }
+                                                }}
+                                                onInputChange={(event, newInputValue, reason) => {
+                                                    if (reason === 'input') {
+                                                        setLabelSearch(newInputValue);
+                                                        if (selectedLabel && selectedLabel.name !== newInputValue) {
+                                                            setSelectedLabel(null);
+                                                        }
+                                                    }
+                                                }}
+                                                inputValue={labelSearch}
+                                                getOptionLabel={(option) => {
+                                                    if (typeof option === 'string') return option;
+                                                    return option.name || '';
+                                                }}
+                                                isOptionEqualToValue={(option, val) => option._id === val?._id}
+                                                loading={labelsLoading}
+                                                noOptionsText={labelSearch.length < 2 ? "En az 2 karakter yazın" : "Label bulunamadı - yeni oluşturulacak"}
+                                                renderOption={(props, option) => (
+                                                    <li {...props} key={option._id}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <LabelIcon sx={{ color: '#FF6B00' }} />
+                                                            <Typography variant="body2">{option.name}</Typography>
+                                                        </Box>
+                                                    </li>
+                                                )}
+                                                renderInput={(params) => (
+                                                    <TextField
+                                                        {...params}
+                                                        label="Label (İsteğe bağlı)"
+                                                        placeholder="Label adı yazın..."
+                                                        InputProps={{
+                                                            ...params.InputProps,
+                                                            startAdornment: (
+                                                                <InputAdornment position="start">
+                                                                    <LabelIcon sx={{ color: '#FF6B00' }} />
+                                                                </InputAdornment>
+                                                            ),
+                                                            endAdornment: (
+                                                                <>
+                                                                    {labelsLoading ? <CircularProgress size={20} /> : null}
+                                                                    {params.InputProps.endAdornment}
+                                                                </>
+                                                            )
+                                                        }}
+                                                    />
+                                                )}
+                                            />
+                                            {labelSearch && !selectedLabel && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                                    "{labelSearch}" bulunamazsa yeni label oluşturulacak
+                                                </Typography>
+                                            )}
+                                            {selectedLabel && (
+                                                <Chip
+                                                    icon={<LabelIcon />}
+                                                    label={selectedLabel.name}
+                                                    onDelete={() => {
+                                                        setSelectedLabel(null);
+                                                        setLabelSearch('');
+                                                    }}
+                                                    sx={{ mt: 1, bgcolor: '#FFF3E0', color: '#FF6B00' }}
+                                                />
+                                            )}
+                                        </Box>
 
                                         <FormControl fullWidth>
                                             <InputLabel>Tür</InputLabel>
@@ -1590,6 +1773,14 @@ const AddMusic = () => {
                                                             </Tooltip>
                                                         )}
                                                         <Chip label={`${getPlatformCount(music.platformLinks)}/5`} size="small" color="primary" variant="outlined" />
+                                                        {music.labelId && (
+                                                            <Chip
+                                                                icon={<LabelIcon sx={{ fontSize: 14 }} />}
+                                                                label={typeof music.labelId === 'object' ? music.labelId.name : 'Label'}
+                                                                size="small"
+                                                                sx={{ bgcolor: '#FF6B00', color: 'white' }}
+                                                            />
+                                                        )}
                                                     </Box>
                                                 }
                                                 secondaryTypographyProps={{ component: 'div' }}
@@ -1740,6 +1931,63 @@ const AddMusic = () => {
                                 </Select>
                             </FormControl>
 
+                            {/* Label (Plak Şirketi) */}
+                            <Box>
+                                <Autocomplete
+                                    freeSolo
+                                    options={editLabelOptions}
+                                    value={editSelectedLabel}
+                                    onChange={(event, newValue) => {
+                                        if (typeof newValue === 'string') {
+                                            setEditSelectedLabel(null);
+                                            setEditLabelSearch(newValue);
+                                        } else {
+                                            setEditSelectedLabel(newValue);
+                                            setEditLabelSearch(newValue?.name || '');
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue, reason) => {
+                                        if (reason === 'input') {
+                                            setEditLabelSearch(newInputValue);
+                                            if (editSelectedLabel && editSelectedLabel.name !== newInputValue) {
+                                                setEditSelectedLabel(null);
+                                            }
+                                        }
+                                    }}
+                                    inputValue={editLabelSearch}
+                                    getOptionLabel={(option) => {
+                                        if (typeof option === 'string') return option;
+                                        return option.name || '';
+                                    }}
+                                    isOptionEqualToValue={(option, val) => option._id === val?._id}
+                                    loading={editLabelsLoading}
+                                    noOptionsText={editLabelSearch.length < 2 ? "En az 2 karakter yazın" : "Label bulunamadı - yeni oluşturulacak"}
+                                    renderOption={(props, option) => (
+                                        <li {...props} key={option._id}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <LabelIcon sx={{ color: '#FF6B00' }} />
+                                                <Typography variant="body2">{option.name}</Typography>
+                                            </Box>
+                                        </li>
+                                    )}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Label (İsteğe bağlı)"
+                                            placeholder="Label adı yazın..."
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <LabelIcon sx={{ color: '#FF6B00' }} />
+                                                    </InputAdornment>
+                                                )
+                                            }}
+                                        />
+                                    )}
+                                />
+                            </Box>
+
                             <Divider>Platform Linkleri</Divider>
 
                             {Object.entries(platformConfig).map(([key, config]) => (
@@ -1767,7 +2015,7 @@ const AddMusic = () => {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => { setOpenEditDialog(false); setEditImagePreview(null); setEditImageFile(null); setEditArtistSearch(''); editImageDataRef.current = null; }}>İptal</Button>
+                    <Button onClick={() => { setOpenEditDialog(false); setEditImagePreview(null); setEditImageFile(null); setEditArtistSearch(''); editImageDataRef.current = null; setEditLabelSearch(''); setEditSelectedLabel(null); setEditLabelOptions([]); }}>İptal</Button>
                     <Button
                         onClick={handleUpdateMusic} variant="contained" disabled={submitLoading}
                         startIcon={submitLoading ? <CircularProgress size={16} /> : <SaveIcon />}

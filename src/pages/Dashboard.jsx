@@ -209,7 +209,7 @@ const Dashboard = () => {
                 api.get('/music').catch(() => ({ data: { data: { musics: [] } } })),
                 api.get('/playlists/admin').catch(() => ({ data: { data: { playlists: [] } } })),
                 api.get('/artists').catch(() => ({ data: { data: { artists: [] } } })),
-                api.get('/artists/claims/pending').catch(() => ({ data: { data: { claims: [] } } })),
+                api.get('/claims/pending').catch(() => ({ data: { data: { claims: [] } } })),
                 api.get('/admin/subscriptions/stats').catch(() => ({ data: { success: false, stats: null } }))
             ]);
 

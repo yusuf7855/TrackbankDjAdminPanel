@@ -37,6 +37,7 @@ import {
     Group,
     PlayCircle,
     MicExternalOn as ArtistIcon,
+    Label as LabelIcon,
     PlaylistAddCheck as ApprovalIcon,
     Category as GenreIcon,
     CardMembership as SubscriptionIcon,
@@ -83,6 +84,15 @@ const menuItems = [
         badge: null,
         badgeColor: 'warning',
         dynamicBadge: true
+    },
+    {
+        id: 'labels',
+        title: 'Label Yönetimi',
+        icon: <LabelIcon />,
+        path: '/admin/labels',
+        description: 'Plak Şirketleri',
+        badge: null,
+        badgeColor: 'warning'
     },
     {
         id: 'artist-essential',

@@ -19,6 +19,7 @@ import StoreManagement from "./pages/StoreManagement.jsx";
 import UserManagement from "./pages/UserManagement.jsx";
 import ArtistManagement from "./pages/ArtistManagement.jsx";
 import ArtistEssentialApproval from "./pages/ArtistEssentialApproval.jsx";
+import LabelManagement from "./pages/LabelManagement.jsx";
 import GenreManagement from "./pages/GenreManagement.jsx";
 import SubscriptionManagement from "./pages/SubscriptionManagement.jsx";
 import SupportTickets from "./pages/SupportTickets.jsx";
@@ -181,6 +182,7 @@ function App() {
                                 <Route path="admin/notifications" element={<Notifications />} />
                                 <Route path="admin/users" element={<UserManagement />} />
                                 <Route path="admin/artists" element={<ArtistManagement />} />
+                                <Route path="admin/labels" element={<LabelManagement />} />
                                 <Route path="admin/artist-essential" element={<ArtistEssentialApproval />} />
                                 <Route path="admin/subscriptions" element={<SubscriptionManagement />} />
                                 <Route path="admin/apple-notifications" element={<AppleNotifications />} />
