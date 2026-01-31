@@ -203,9 +203,11 @@ export default function ArtistEssentialApproval() {
 
     // Playlist Card Component
     const PlaylistCard = ({ playlist, showActions = true, status = 'pending' }) => {
-        // userId populate edilmiş owner bilgisi
-        const owner = playlist.userId || {};
-        const badge = owner.badge || 'standard';
+        // profileId varsa onu kullan (multi-profil desteği), yoksa userId'yi kullan
+        const profile = playlist.profileId || null;
+        const user = playlist.userId || {};
+        const owner = profile || user;
+        const badge = profile?.badge || user.badge || 'standard';
         const musicCount = playlist.musics?.length || 0;
 
         return (
@@ -268,7 +270,7 @@ export default function ArtistEssentialApproval() {
                                 </Avatar>
                                 <Box>
                                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                        {owner.displayName || owner.username || owner.firstName || 'Bilinmiyor'}
+                                        {owner.name || owner.displayName || owner.username || owner.firstName || 'Bilinmiyor'}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
                                         {formatDate(playlist.createdAt)}
@@ -551,23 +553,30 @@ export default function ArtistEssentialApproval() {
                                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                                     Oluşturan
                                 </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                    <Avatar src={getImageUrl(viewDialog.playlist.userId?.profileImage)}>
-                                        <PersonIcon />
-                                    </Avatar>
-                                    <Box>
-                                        <Typography variant="body1">
-                                            {viewDialog.playlist.userId?.displayName || viewDialog.playlist.userId?.username || 'Bilinmiyor'}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {viewDialog.playlist.userId?.email}
-                                        </Typography>
-                                    </Box>
-                                    <Chip
-                                        label={viewDialog.playlist.userId?.badge || 'standard'}
-                                        size="small"
-                                    />
-                                </Box>
+                                {(() => {
+                                    const profile = viewDialog.playlist.profileId;
+                                    const user = viewDialog.playlist.userId;
+                                    const owner = profile || user || {};
+                                    return (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Avatar src={getImageUrl(owner.profileImage)}>
+                                                <PersonIcon />
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="body1">
+                                                    {owner.name || owner.displayName || owner.username || 'Bilinmiyor'}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {user?.email || ''}
+                                                </Typography>
+                                            </Box>
+                                            <Chip
+                                                label={owner.badge || 'standard'}
+                                                size="small"
+                                            />
+                                        </Box>
+                                    );
+                                })()}
                             </Box>
 
                             {/* Music List */}
