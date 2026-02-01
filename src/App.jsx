@@ -26,6 +26,7 @@ import SupportTickets from "./pages/SupportTickets.jsx";
 import Maintenance from "./pages/Maintenance.jsx";
 import AppleNotifications from "./pages/AppleNotifications.jsx";
 import Revenue from "./pages/Revenue.jsx";
+import Backups from "./pages/Backups.jsx";
 
 // Modern tema oluştur
 const theme = createTheme({
@@ -189,6 +190,7 @@ function App() {
                                 <Route path="admin/revenue" element={<Revenue />} />
                                 <Route path="admin/support" element={<SupportTickets />} />
                                 <Route path="admin/maintenance" element={<Maintenance />} />
+                                <Route path="admin/backups" element={<Backups />} />
                                 <Route path="admin/analytics" element={<div style={{ padding: '24px' }}>
                                     <h2>Analytics</h2>
                                     <p>Analytics sayfası yakında...</p>

@@ -45,7 +45,8 @@ import {
     SupportAgent as SupportIcon,
     Build as MaintenanceIcon,
     Apple as AppleIcon,
-    AttachMoney as RevenueIcon
+    AttachMoney as RevenueIcon,
+    Backup as BackupIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -195,6 +196,15 @@ const menuItems = [
         description: 'Uygulama Bakım Yönetimi',
         badge: null,
         badgeColor: 'warning'
+    },
+    {
+        id: 'backups',
+        title: 'Yedekler',
+        icon: <BackupIcon />,
+        path: '/admin/backups',
+        description: 'Veritabanı Yedekleri',
+        badge: 'NEW',
+        badgeColor: 'info'
     },
     {
         id: 'settings',
